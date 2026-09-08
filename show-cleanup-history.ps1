@@ -7,7 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -66,7 +66,7 @@ foreach ($dir in (Resolve-LogDirs -Preferred $LogDir)) {
 $logs = @($logs | Sort-Object LastWriteTime -Descending | Select-Object -First $Top)
 
 Write-Host ""
-Write-Host "== WinSweep history ==" -ForegroundColor Green
+Write-Host "== KappaSweep history ==" -ForegroundColor Green
 if ($logs.Count -eq 0) {
     Write-Host "No cleanup logs found." -ForegroundColor Yellow
     return

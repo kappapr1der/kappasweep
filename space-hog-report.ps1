@@ -14,7 +14,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -217,9 +217,9 @@ function Add-ApplicationSpaceItems {
 
     if ($QuickMode) { return }
 
-    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Загрузки" -Path (Join-Path $profile "Downloads") -Action "Только диагностика; не удаляется WinSweep"
-    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Рабочий стол" -Path (Join-Path $profile "Desktop") -Action "Только диагностика; не удаляется WinSweep"
-    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Документы" -Path (Join-Path $profile "Documents") -Action "Только диагностика; не удаляется WinSweep"
+    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Загрузки" -Path (Join-Path $profile "Downloads") -Action "Только диагностика; не удаляется KappaSweep"
+    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Рабочий стол" -Path (Join-Path $profile "Desktop") -Action "Только диагностика; не удаляется KappaSweep"
+    Add-SpaceItem -Items $Items -Scope "Личные данные" -Name "Документы" -Path (Join-Path $profile "Documents") -Action "Только диагностика; не удаляется KappaSweep"
 }
 
 function Add-DriveFolderItems {
@@ -236,7 +236,7 @@ function Add-DriveFolderItems {
             $personalFolders = @("Downloads", "Desktop", "Documents", "Pictures", "Videos", "OneDrive")
             foreach ($folderName in $personalFolders) {
                 $candidate = Join-Path $profileRoot $folderName
-                Add-SpaceItem -Items $Items -Scope "Личные данные" -Name $folderName -Path $candidate -Action "Только диагностика; не удаляется WinSweep"
+                Add-SpaceItem -Items $Items -Scope "Личные данные" -Name $folderName -Path $candidate -Action "Только диагностика; не удаляется KappaSweep"
             }
             continue
         }
@@ -380,20 +380,20 @@ function Write-HtmlReport {
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>WinSweep - диагностика места</title>
+<title>KappaSweep - диагностика места</title>
 <style>
 body{margin:0;background:#f4f6f8;color:#18212b;font:14px/1.45 Segoe UI,Arial,sans-serif}main{max-width:1280px;margin:0 auto;padding:32px 24px 48px}h1{margin:0 0 6px;font-size:28px}h2{margin:30px 0 10px;font-size:18px}.muted{color:#5f6b76}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:20px}.metric{background:#fff;border:1px solid #d8dee5;border-radius:6px;padding:14px}.metric strong{display:block;font-size:18px}.metric span{color:#52606d}section.table{background:#fff;border:1px solid #d8dee5;border-radius:6px;overflow:auto}table{width:100%;border-collapse:collapse;min-width:930px}th,td{padding:10px 12px;border-bottom:1px solid #e8edf1;text-align:left;vertical-align:top}th{background:#eef2f5;color:#344250;font-weight:600}.size{white-space:nowrap;font-weight:600}td:last-child{font:12px/1.35 Consolas,monospace;word-break:break-all}.notice{border-left:4px solid #2368a2;background:#eaf3fb;padding:12px 14px;margin-top:18px}.footer{color:#5f6b76;font-size:12px;margin-top:24px}
 </style>
 </head>
 <body><main>
-<h1>WinSweep: куда ушло место</h1>
+<h1>KappaSweep: куда ушло место</h1>
 <p class="muted">Снимок создан __TIME__. Отчёт ничего не удаляет.</p>
 <div class="metrics">__DRIVES__</div>
-<div class="notice">"Доступно" означает, что для этой категории есть отдельный безопасный переключатель или режим WinSweep. Личные данные, WinSxS, DriverStore, Docker/WSL и системные файлы отчёт только показывает.</div>
+<div class="notice">"Доступно" означает, что для этой категории есть отдельный безопасный переключатель или режим KappaSweep. Личные данные, WinSxS, DriverStore, Docker/WSL и системные файлы отчёт только показывает.</div>
 <h2>Главные потребители</h2><section class="table"><table><thead><tr><th>Категория</th><th>Название</th><th>Размер</th><th>С прошлого снимка</th><th>Что делать</th><th>Путь</th></tr></thead><tbody>__LARGEST__</tbody></table></section>
 <h2>Кэши приложений</h2><section class="table"><table><thead><tr><th>Категория</th><th>Название</th><th>Размер</th><th>С прошлого снимка</th><th>Что делать</th><th>Путь</th></tr></thead><tbody>__CACHES__</tbody></table></section>
 <h2>Windows и системное хранилище</h2><section class="table"><table><thead><tr><th>Категория</th><th>Название</th><th>Размер</th><th>С прошлого снимка</th><th>Что делать</th><th>Путь</th></tr></thead><tbody>__SYSTEM__</tbody></table></section>
-<p class="footer">История хранится локально в space-hog-history.jsonl рядом с журналами WinSweep.</p>
+<p class="footer">История хранится локально в space-hog-history.jsonl рядом с журналами KappaSweep.</p>
 </main></body></html>
 '@
     $html = $htmlTemplate.Replace("__TIME__", (Get-Date).ToString("yyyy-MM-dd HH:mm"))
@@ -461,7 +461,7 @@ Add-ChangeColumn -Items $sortedItems -PreviousSnapshot $previousSnapshot
 if (-not $SkipHistory) { Save-Snapshot -HistoryFile $historyFile -Items $sortedItems }
 
 Write-Host ""
-Write-Host "== WinSweep: куда ушло место ==" -ForegroundColor Green
+Write-Host "== KappaSweep: куда ушло место ==" -ForegroundColor Green
 $selectedDrives | ForEach-Object {
     $freePercent = [Math]::Round(($_.FreeBytes / $_.TotalBytes) * 100, 1)
     Write-Host ("{0}: свободно {1} из {2} ({3}%)" -f $_.Drive, (Format-ByteSize $_.FreeBytes), (Format-ByteSize $_.TotalBytes), $freePercent)

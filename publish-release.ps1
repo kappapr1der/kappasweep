@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string]$Version = "",
-    [string]$Repository = "kappapr1der/winsweep",
+    [string]$Repository = "kappapr1der/kappasweep",
     [string]$Token = "",
     [string]$TargetCommitish = "main",
     [switch]$Prerelease,
@@ -11,7 +11,7 @@ param(
     [switch]$SkipTagPush,
     [switch]$Portable,
     [ValidateRange(10, 300)]
-    [int]$RequestTimeoutSeconds = 30,
+    [int]$RequestTimeoutSeconds = 300,
     [ValidateRange(30, 900)]
     [int]$BuildTimeoutSeconds = 300,
     [switch]$DryRun
@@ -24,15 +24,15 @@ $root = Split-Path -Parent $PSCommandPath
 $cleanupScript = Join-Path $root "cleanup-windows.ps1"
 $buildScript = Join-Path $root "build-release.ps1"
 
-function Get-WinSweepVersion {
+function Get-KappaSweepVersion {
     param([string]$ScriptPath)
 
     $text = Get-Content -LiteralPath $ScriptPath -Raw -Encoding UTF8
-    if ($text -match 'WinSweepVersion\s*=\s*"([^"]+)"') {
+    if ($text -match 'KappaSweepVersion\s*=\s*"([^"]+)"') {
         return $Matches[1]
     }
 
-    throw "Could not read WinSweepVersion from cleanup-windows.ps1."
+    throw "Could not read KappaSweepVersion from cleanup-windows.ps1."
 }
 
 function Get-PlainTextSecret {
@@ -57,7 +57,12 @@ function Get-TokenStorePath {
         $base = Join-Path $HOME "AppData\Roaming"
     }
 
-    return Join-Path (Join-Path $base "WinSweep") "github-token.txt"
+    $current = Join-Path (Join-Path $base "KappaSweep") "github-token.txt"
+    $legacy = Join-Path (Join-Path $base "WinSweep") "github-token.txt"
+    if (-not (Test-Path -LiteralPath $current) -and (Test-Path -LiteralPath $legacy -PathType Leaf)) {
+        return $legacy
+    }
+    return $current
 }
 
 function Get-StoredReleaseToken {
@@ -89,7 +94,7 @@ function Get-ReleaseToken {
         return $ExplicitToken.Trim()
     }
 
-    foreach ($name in @("WINSWEEP_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN")) {
+    foreach ($name in @("KAPPASWEEP_GITHUB_TOKEN", "WINSWEEP_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN")) {
         $value = [Environment]::GetEnvironmentVariable($name, "Process")
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Write-Host "Using token from $name."
@@ -102,7 +107,7 @@ function Get-ReleaseToken {
         return $stored
     }
 
-    Write-Host "GitHub token was not found in WINSWEEP_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN."
+    Write-Host "GitHub token was not found in KAPPASWEEP_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN."
     Write-Host "Create a fine-grained token with repository Contents: Read and write, then paste it below."
     Write-Host "Tip: run save-github-token.ps1 once to avoid pasting the token every time."
     $secure = Read-Host "GitHub token (hidden)" -AsSecureString
@@ -159,7 +164,7 @@ function Invoke-GitHubCurl {
             ('header = "Authorization: Bearer {0}"' -f $AuthToken)
             'header = "Accept: application/vnd.github+json"'
             'header = "X-GitHub-Api-Version: 2022-11-28"'
-            'header = "User-Agent: WinSweepReleasePublisher"'
+            'header = "User-Agent: KappaSweepReleasePublisher"'
         )
         [IO.File]::WriteAllLines($configPath, $configLines, [Text.UTF8Encoding]::new($false))
 
@@ -328,7 +333,7 @@ if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = Get-WinSweepVersion -ScriptPath $cleanupScript
+    $Version = Get-KappaSweepVersion -ScriptPath $cleanupScript
 }
 
 $Version = $Version.Trim().TrimStart("v")
@@ -341,8 +346,8 @@ if ([string]::IsNullOrWhiteSpace($Repository) -or $Repository -notmatch '^[^/\s]
 }
 
 $tag = "v$Version"
-$assetPrefix = if ($Portable) { "WinSweep-Portable" } else { "WinSweep" }
-$releaseTitle = if ($Portable) { "WinSweep $tag - Portable" } else { "WinSweep $tag" }
+$assetPrefix = if ($Portable) { "KappaSweep-Portable" } else { "KappaSweep" }
+$releaseTitle = if ($Portable) { "KappaSweep $tag - Portable" } else { "KappaSweep $tag" }
 $zipPath = Join-Path $root ("dist\{0}-v{1}.zip" -f $assetPrefix, $Version)
 $notesPath = Join-Path $root "release-notes.md"
 $assetName = Split-Path -Leaf $zipPath
@@ -357,51 +362,12 @@ if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
     throw "Release zip was not created: $zipPath"
 }
 
-$highlights = @(
-    "- Startup Guard и Pressure Guard теперь координируются: второй фоновый запуск в течение 45 минут спокойно пропускается",
-    "- исчезнувшие между сканированием и удалением временные файлы теперь считаются обычным пропуском, а не ошибкой очистки",
-    "- отдельные переключатели кэшей Discord, Telegram и других программ",
-    "- исключения для папок, которые нельзя чистить",
-    "- отдельные пороги свободного места для каждого диска",
-    "- история изменения свободного места и анализ крупных папок",
-    "- безопасная диагностика гибернации, точек восстановления и компонентов Windows",
-    "- открытие HTML-отчётов в Google Chrome с безопасным fallback",
-    "- пересоздание задач Планировщика с прямым путём к системному PowerShell",
-    "- восстановление ярлыков Windows PowerShell из главного меню",
-    "- нативный .NET 8 Control Center для очистки, диагностики, истории и настроек",
-    "- исправлена инициализация WPF-шрифтов: окно теперь стабильно открывается с русской локализацией",
-    "- автозапуски Планировщика теперь скрывают PowerShell и не показывают консоль каждые три часа",
-    "- системное уведомление после очистки показывает освобождённое место и крупнейшие очищенные категории",
-    "- кэш браузеров автоматически пропускается, пока браузер открыт: активные вкладки не затрагиваются",
-    "- открытые Discord, Telegram, Razer и игровые лаунчеры пропускаются без ошибок и без частичной очистки",
-    "- Spotify полностью исключён из автоматической очистки, чтобы Store-версия не потеряла данные интерфейса",
-    "- автозащита получила лёгкий, обычный и экстренный уровни давления 75/50/30 ГБ",
-    "- в GUI добавлены локальная сводка за 7/30 дней и проверка новых релизов GitHub",
-    "- отдельная диагностика кодировки UTF-8 для логов и HTML-отчётов",
-    "- явная UTF-8 передача вывода PowerShell в GUI без кракозябр",
-    "- системный раздел с анализом компонентного хранилища и обратимым управлением гибернацией",
-    "- self-contained WinSweep.exe: .NET не требуется устанавливать отдельно для запуска",
-    "- живой журнал внизу окна: видны вывод сценария, отчёт и текст ошибки, если она возникла",
-    "- предохранители .NET GUI: одна операция за раз, лимит времени и остановка процесса при 1,5 ГБ памяти",
-    "- исправлен запуск «Пожирателей места»: параметры диагностики передаются корректно",
-    "- журнал запуска стал выше, а полный лог можно открыть одной кнопкой",
-    "- Планировщик portable-версии теперь проверяет путь к движку и не остаётся привязанным к старой папке",
-    "- заблокированные открытыми программами файлы считаются предупреждением, а не провалом всей очистки",
-    "- по умолчанию включены безопасные кэши браузеров, приложений, игр и инструментов разработки",
-    "- добавлена очистка кэшей Battlefield и Razer без затрагивания модов, настроек и данных устройств"
-)
-
-if ($Portable) {
-    $highlights = @(
-        "- настоящая portable-сборка: движок и настройки создаются в скрытой папке WinSweepData рядом с WinSweep.exe",
-        "- папку можно перенести или скопировать целиком, не теряя настройки"
-    ) + $highlights
-}
+$highlights = @(Get-Content -LiteralPath (Join-Path $root 'release-highlights.md') -Encoding UTF8 -ErrorAction Stop)
 
 @(
     $releaseTitle,
     "",
-    "Скачайте $assetName, распакуйте архив и запустите WinSweep.exe.",
+    "Скачайте $assetName, распакуйте архив и запустите KappaSweep.exe.",
     "",
     "Что нового:"
 ) + $highlights | Set-Content -LiteralPath $notesPath -Encoding UTF8

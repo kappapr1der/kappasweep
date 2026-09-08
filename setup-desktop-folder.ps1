@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$FolderName = "WinSweep",
+    [string]$FolderName = "KappaSweep",
     [string]$DestinationRoot = "",
     [switch]$InstallSchedule,
     [switch]$BrowserCaches,
@@ -60,25 +60,25 @@ $targetRoot = Join-Path $desktop $FolderName
 New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
 
 $exeCandidates = @(
-    (Join-Path $sourceRoot "WinSweep.exe"),
-    (Join-Path $sourceRoot "dist\WinSweep.exe")
+    (Join-Path $sourceRoot "KappaSweep.exe"),
+    (Join-Path $sourceRoot "dist\KappaSweep.exe")
 )
 $exeSource = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if ($exeSource) {
-    Copy-Item -LiteralPath $exeSource -Destination (Join-Path $targetRoot "WinSweep.exe") -Force
+    Copy-Item -LiteralPath $exeSource -Destination (Join-Path $targetRoot "KappaSweep.exe") -Force
 }
 
 $files = @(
     "cleanup-windows.ps1",
     "install-scheduled-cleanup.ps1",
-    "winsweep-menu.bat",
-    "winsweep-ui.ps1",
-    "winsweep-ui.bat",
-    "winsweep-encoding.ps1",
+    "kappasweep-menu.bat",
+    "kappasweep-ui.ps1",
+    "kappasweep-ui.bat",
+    "kappasweep-encoding.ps1",
     "system-tweaks.ps1",
     "check-log-encoding.ps1",
     "check-log-encoding.bat",
-    "winsweep-config.json",
+    "kappasweep-config.json",
     "scan-results.bat",
     "cleanup-now.bat",
     "cleanup-safe-now.bat",
@@ -96,8 +96,8 @@ $files = @(
     "open-report-in-chrome.ps1",
     "repair-powershell-shortcut.ps1",
     "repair-powershell-shortcut.bat",
-    "manage-winsweep-settings.ps1",
-    "manage-winsweep-settings.bat",
+    "manage-kappasweep-settings.ps1",
+    "manage-kappasweep-settings.bat",
     "system-maintenance-check.ps1",
     "system-maintenance-check.bat",
     "show-cleanup-history.ps1",
@@ -130,7 +130,7 @@ foreach ($file in $files) {
         continue
     }
 
-    if ($file -eq "winsweep-config.json" -and (Test-Path -LiteralPath $destination -PathType Leaf)) {
+    if ($file -eq "kappasweep-config.json" -and (Test-Path -LiteralPath $destination -PathType Leaf)) {
         try {
             Update-ConfigWithoutReset -DefaultConfigPath $source -ExistingConfigPath $destination
             Write-Host "Updated config without resetting personal settings:"

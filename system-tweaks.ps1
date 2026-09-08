@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -56,7 +56,7 @@ if (-not $Status -and -not $DisableHibernation -and -not $EnableHibernation) {
 }
 
 $before = Get-HibernationState
-Write-Host "== WinSweep: системные настройки ==" -ForegroundColor Green
+Write-Host "== KappaSweep: системные настройки ==" -ForegroundColor Green
 Write-Host ("Файл гибернации: {0} ({1})" -f $before.Path, $before.Size)
 Write-Host "Отключение убирает hiberfil.sys и Fast Startup. Действие обратимо кнопкой включения." -ForegroundColor DarkGray
 

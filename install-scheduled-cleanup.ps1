@@ -26,7 +26,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -54,7 +54,7 @@ function Get-ConfigProperty {
     return $property.Value
 }
 
-function Resolve-WinSweepPath {
+function Resolve-KappaSweepPath {
     param([string]$Path)
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
@@ -109,13 +109,13 @@ function Set-SwitchFromConfig {
 }
 
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
-    $defaultConfigPath = Join-Path $PSScriptRoot "winsweep-config.json"
+    $defaultConfigPath = Join-Path $PSScriptRoot "kappasweep-config.json"
     if (Test-Path -LiteralPath $defaultConfigPath -PathType Leaf -ErrorAction SilentlyContinue) {
         $ConfigPath = $defaultConfigPath
     }
 }
 else {
-    $ConfigPath = Resolve-WinSweepPath -Path $ConfigPath
+    $ConfigPath = Resolve-KappaSweepPath -Path $ConfigPath
 }
 
 if (-not [string]::IsNullOrWhiteSpace($ConfigPath) -and (Test-Path -LiteralPath $ConfigPath -PathType Leaf -ErrorAction SilentlyContinue)) {

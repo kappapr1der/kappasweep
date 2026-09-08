@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, for example 0.4.0 or v0.4.0"
+        description: "Release version, for example 1.3.0 or v1.3.0"
         required: true
         type: string
       prerelease:
@@ -48,9 +48,9 @@ jobs:
             throw "Version is empty."
           }
 
-          "WINSWEEP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "WINSWEEP_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "WINSWEEP_PRERELEASE=$prerelease" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KAPPASWEEP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KAPPASWEEP_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KAPPASWEEP_PRERELEASE=$prerelease" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Validate PowerShell scripts
         shell: pwsh
@@ -69,8 +69,8 @@ jobs:
       - name: Build release zip
         shell: pwsh
         run: |
-          .\build-release.ps1 -Version $env:WINSWEEP_VERSION -Portable
-          $zip = "dist\WinSweep-Portable-v$env:WINSWEEP_VERSION.zip"
+          .\build-release.ps1 -Version $env:KAPPASWEEP_VERSION -Portable
+          $zip = "dist\KappaSweep-Portable-v$env:KAPPASWEEP_VERSION.zip"
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
             throw "Release zip was not created: $zip"
           }
@@ -79,24 +79,19 @@ jobs:
         shell: pwsh
         run: |
           @(
-            "WinSweep $env:WINSWEEP_TAG - Portable",
+            "KappaSweep $env:KAPPASWEEP_TAG - Portable",
             "",
-            "Скачайте ``WinSweep-Portable-v$env:WINSWEEP_VERSION.zip``, распакуйте архив и запустите ``WinSweep.exe``.",
+            "Скачайте ``KappaSweep-Portable-v$env:KAPPASWEEP_VERSION.zip``, распакуйте архив и запустите ``KappaSweep.exe``.",
             "",
-            "Что нового:",
-            "- настоящая portable-сборка: движок и настройки создаются рядом с EXE",
-            "- папку можно перенести или скопировать целиком, не теряя настройки",
-            "- единый Control Center для очистки, диагностики, истории и настроек",
-            "- переключатели кэшей Discord, Telegram, Spotify и других программ",
-            "- пользовательский ZIP без батников и ручного запуска PowerShell"
-          ) | Set-Content -LiteralPath release-notes.md -Encoding UTF8
+            "Что нового:"
+          ) + @(Get-Content -LiteralPath release-highlights.md -Encoding UTF8) | Set-Content -LiteralPath release-notes.md -Encoding UTF8
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.WINSWEEP_TAG }}
+          tag_name: ${{ env.KAPPASWEEP_TAG }}
           target_commitish: ${{ github.sha }}
-          name: WinSweep ${{ env.WINSWEEP_TAG }} - Portable
+          name: KappaSweep ${{ env.KAPPASWEEP_TAG }} - Portable
           body_path: release-notes.md
-          files: dist/WinSweep-Portable-v${{ env.WINSWEEP_VERSION }}.zip
-          prerelease: ${{ env.WINSWEEP_PRERELEASE }}
+          files: dist/KappaSweep-Portable-v${{ env.KAPPASWEEP_VERSION }}.zip
+          prerelease: ${{ env.KAPPASWEEP_PRERELEASE }}

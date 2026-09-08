@@ -11,7 +11,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -334,7 +334,7 @@ if ($SkipHistory) {
     Write-Host "Disk history recording is disabled for this run." -ForegroundColor DarkGray
 }
 elseif ($previousSnapshot) {
-    Write-Host "Comparison uses the previous WinSweep disk report." -ForegroundColor DarkGray
+    Write-Host "Comparison uses the previous KappaSweep disk report." -ForegroundColor DarkGray
 }
 else {
     Write-Host "First disk snapshot saved. Run this report again later to see changes." -ForegroundColor DarkGray

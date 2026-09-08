@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$DumpFolder = (Join-Path $env:ProgramData 'WinSweep\Dumps'),
+    [string]$DumpFolder = (Join-Path $env:ProgramData 'KappaSweep\Dumps'),
 
     [ValidateRange(1, 10)]
     [int]$DumpCount = 3,

@@ -14,7 +14,12 @@ function Get-TokenStorePath {
         $base = Join-Path $HOME "AppData\Roaming"
     }
 
-    return Join-Path (Join-Path $base "WinSweep") "github-token.txt"
+    $current = Join-Path (Join-Path $base "KappaSweep") "github-token.txt"
+    $legacy = Join-Path (Join-Path $base "WinSweep") "github-token.txt"
+    if (-not (Test-Path -LiteralPath $current) -and (Test-Path -LiteralPath $legacy -PathType Leaf)) {
+        return $legacy
+    }
+    return $current
 }
 
 $path = Get-TokenStorePath
@@ -38,7 +43,7 @@ if ($Clear) {
 }
 
 if ([string]::IsNullOrWhiteSpace($Token)) {
-    Write-Host "Paste a GitHub fine-grained token with Contents: Read and write for kappapr1der/winsweep."
+    Write-Host "Paste a GitHub fine-grained token with Contents: Read and write for kappapr1der/kappasweep."
     Write-Host "The token will be encrypted for this Windows user with DPAPI and saved outside the repository."
     $secure = Read-Host "GitHub token (hidden)" -AsSecureString
 }

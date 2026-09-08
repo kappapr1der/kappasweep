@@ -5,11 +5,11 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 
-namespace WinSweepLauncher;
+namespace KappaSweepLauncher;
 
 internal static class Program
 {
-    private const string PayloadResource = "WinSweepPayload.zip";
+    private const string PayloadResource = "KappaSweepPayload.zip";
 
     [STAThread]
     private static int Main()
@@ -18,6 +18,7 @@ internal static class Program
         {
             var engineRoot = GetEngineRoot();
             Directory.CreateDirectory(engineRoot);
+            ImportLegacySettings(engineRoot);
             ExtractPayload(engineRoot);
 
             var commandLine = Environment.GetCommandLineArgs();
@@ -29,7 +30,10 @@ internal static class Program
             if (commandLine.Any(argument =>
                     string.Equals(argument, "--render-test", StringComparison.OrdinalIgnoreCase)))
             {
-                return MainWindow.RunRenderSmokeTest(engineRoot) ? 0 : 1;
+                var outputIndex = Array.IndexOf(commandLine, "--render-output");
+                var renderOutput = outputIndex >= 0 && outputIndex + 1 < commandLine.Length
+                    ? commandLine[outputIndex + 1] : null;
+                return MainWindow.RunRenderSmokeTest(engineRoot, renderOutput) ? 0 : 1;
             }
 
             var app = new Application
@@ -40,7 +44,7 @@ internal static class Program
             {
                 MessageBox.Show(
                     eventArgs.Exception.Message,
-                    "WinSweep",
+                    "KappaSweep",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 eventArgs.Handled = true;
@@ -53,7 +57,7 @@ internal static class Program
         {
             MessageBox.Show(
                 exception.Message,
-                "WinSweep",
+                "KappaSweep",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             return 1;
@@ -63,19 +67,35 @@ internal static class Program
     private static string GetEngineRoot()
     {
 #if PORTABLE
-        return Path.Combine(AppContext.BaseDirectory, "WinSweepData");
+        return SelectEngineRoot(AppContext.BaseDirectory, "KappaSweepData", "WinSweepData");
 #else
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WinSweep",
-            "Engine");
+        var localRoot = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return SelectEngineRoot(localRoot, Path.Combine("KappaSweep", "Engine"), Path.Combine("WinSweep", "Engine"));
 #endif
+    }
+
+    private static string SelectEngineRoot(string parent, string currentName, string legacyName)
+    {
+        var current = Path.Combine(parent, currentName);
+        var legacy = Path.Combine(parent, legacyName);
+        // Reuse the existing engine so scheduled task paths and custom files stay valid.
+        return Directory.Exists(current) || !Directory.Exists(legacy) ? current : legacy;
+    }
+
+    private static void ImportLegacySettings(string engineRoot)
+    {
+        var current = Path.Combine(engineRoot, "kappasweep-config.json");
+        var legacy = Path.Combine(engineRoot, "winsweep-config.json");
+        if (!File.Exists(current) && File.Exists(legacy))
+        {
+            File.Copy(legacy, current, overwrite: false);
+        }
     }
 
     private static void ExtractPayload(string engineRoot)
     {
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(PayloadResource)
-            ?? throw new InvalidOperationException("WinSweep payload is missing from the executable.");
+            ?? throw new InvalidOperationException("KappaSweep payload is missing from the executable.");
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, false);
 
         var root = Path.GetFullPath(engineRoot) + Path.DirectorySeparatorChar;
@@ -85,7 +105,7 @@ internal static class Program
             var destination = Path.GetFullPath(Path.Combine(engineRoot, relativePath));
             if (!destination.StartsWith(root, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException("WinSweep payload contains an unsafe path.");
+                throw new InvalidDataException("KappaSweep payload contains an unsafe path.");
             }
 
             if (string.IsNullOrEmpty(entry.Name))
@@ -95,7 +115,8 @@ internal static class Program
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            if (string.Equals(entry.Name, "winsweep-config.json", StringComparison.OrdinalIgnoreCase)
+            if ((string.Equals(entry.Name, "kappasweep-config.json", StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(entry.Name, "extra-cache-paths.txt", StringComparison.OrdinalIgnoreCase))
                 && File.Exists(destination))
             {
                 continue;

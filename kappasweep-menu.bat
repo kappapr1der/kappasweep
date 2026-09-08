@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "SCRIPT=%~dp0cleanup-windows.ps1"
-set "CONFIG=%~dp0winsweep-config.json"
+set "CONFIG=%~dp0kappasweep-config.json"
 
 if not exist "%SCRIPT%" (
     echo cleanup-windows.ps1 was not found next to this file.
@@ -12,7 +12,7 @@ if not exist "%SCRIPT%" (
 )
 
 if not exist "%CONFIG%" (
-    echo winsweep-config.json was not found next to this file.
+    echo kappasweep-config.json was not found next to this file.
     echo The menu can still run, but config defaults will not be loaded.
     echo.
     pause
@@ -22,7 +22,7 @@ if not exist "%CONFIG%" (
 cls
 echo.
 echo ==============================
-echo WinSweep
+echo KappaSweep
 echo ==============================
 echo.
 echo 1. Scan results (no deletion)
@@ -38,7 +38,7 @@ echo A. Install scheduled tasks (admin)
 echo B. Edit config
 echo C. Cache switches, disk thresholds, and exclusions
 echo D. Disk analyzer lite
-echo G. Open WinSweep Control Center
+echo G. Open KappaSweep Control Center
 echo P. Repair PowerShell shortcuts
 echo M. System maintenance check (no deletion)
 echo Q. Quit
@@ -104,7 +104,7 @@ if /i "%PICK%"=="b" (
 )
 
 if /i "%PICK%"=="c" (
-    call "%~dp0manage-winsweep-settings.bat"
+    call "%~dp0manage-kappasweep-settings.bat"
     goto menu
 )
 
@@ -114,7 +114,7 @@ if /i "%PICK%"=="d" (
 )
 
 if /i "%PICK%"=="g" (
-    call "%~dp0winsweep-ui.bat"
+    call "%~dp0kappasweep-ui.bat"
     goto menu
 )
 

@@ -30,7 +30,7 @@ foreach ($dir in ($candidates | Select-Object -Unique)) {
 
 $latest = @($reports | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
 if ($latest.Count -eq 0) {
-    Write-Host "No WinSweep HTML reports found." -ForegroundColor Yellow
+    Write-Host "No KappaSweep HTML reports found." -ForegroundColor Yellow
     return
 }
 

@@ -14,11 +14,11 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace WinSweepLauncher;
+namespace KappaSweepLauncher;
 
 public partial class MainWindow : Window
 {
-    private const string Version = "1.2.2";
+    private const string Version = "1.3.0";
     private const long WorkingSetLimitBytes = 1536L * 1024 * 1024;
     private static readonly HttpClient UpdateClient = new() { Timeout = TimeSpan.FromSeconds(8) };
 
@@ -41,7 +41,7 @@ public partial class MainWindow : Window
     public MainWindow(string engineRoot)
     {
         _engineRoot = engineRoot;
-        _configPath = Path.Combine(_engineRoot, "winsweep-config.json");
+        _configPath = Path.Combine(_engineRoot, "kappasweep-config.json");
         _powerShellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
         if (!File.Exists(_powerShellPath))
         {
@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     {
         var expected = new[]
         {
-            "cleanup-windows.ps1", "winsweep-config.json", "space-hog-report.ps1",
+            "cleanup-windows.ps1", "kappasweep-config.json", "space-hog-report.ps1",
             "system-maintenance-check.ps1", "install-scheduled-cleanup.ps1"
         };
         var engineIsValid = expected.All(file => File.Exists(Path.Combine(engineRoot, file)))
@@ -78,7 +78,7 @@ public partial class MainWindow : Window
         try
         {
             var window = new MainWindow(engineRoot);
-            var uiIsValid = window.Title == "WinSweep Control Center" && window._cacheCheckboxes.Count == 10;
+            var uiIsValid = window.Title == "KappaSweep Control Center" && window._cacheCheckboxes.Count == 10;
             window.Close();
             return uiIsValid;
         }
@@ -88,7 +88,7 @@ public partial class MainWindow : Window
         }
     }
 
-    public static bool RunRenderSmokeTest(string engineRoot)
+    public static bool RunRenderSmokeTest(string engineRoot, string? renderOutput = null)
     {
         var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         var rendered = false;
@@ -116,6 +116,19 @@ public partial class MainWindow : Window
                 closeTimer.Tick += (_, _) =>
                 {
                     closeTimer.Stop();
+                    if (!string.IsNullOrWhiteSpace(renderOutput))
+                    {
+                        var content = (FrameworkElement)window.Content;
+                        content.UpdateLayout();
+                        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                            (int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight),
+                            96, 96, PixelFormats.Pbgra32);
+                        bitmap.Render(content);
+                        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                        using var stream = File.Create(renderOutput);
+                        encoder.Save(stream);
+                    }
                     window.Close();
                     application.Shutdown();
                 };
@@ -139,7 +152,7 @@ public partial class MainWindow : Window
 
     private ImageSource? LoadWindowIcon()
     {
-        var iconPath = Path.Combine(_engineRoot, "winsweep-icon.png");
+        var iconPath = Path.Combine(_engineRoot, "kappasweep-icon.png");
         if (!File.Exists(iconPath))
         {
             return null;
@@ -198,11 +211,11 @@ public partial class MainWindow : Window
     {
         if (!File.Exists(_configPath))
         {
-            throw new FileNotFoundException("winsweep-config.json was not found.", _configPath);
+            throw new FileNotFoundException("kappasweep-config.json was not found.", _configPath);
         }
 
         _config = JsonNode.Parse(File.ReadAllText(_configPath, Encoding.UTF8)) as JsonObject
-            ?? throw new InvalidDataException("winsweep-config.json must contain an object.");
+            ?? throw new InvalidDataException("kappasweep-config.json must contain an object.");
     }
 
     private void RefreshDrives()
@@ -542,7 +555,7 @@ public partial class MainWindow : Window
             _activeStartedAt = DateTime.UtcNow;
             SetActionState(true, elevated
                 ? $"Выполняется: {title}. Подтверди UAC, прогресс останется здесь."
-                : $"Выполняется: {title}. Не закрывай WinSweep.");
+                : $"Выполняется: {title}. Не закрывай KappaSweep.");
             AppendLog(elevated ? $"Запущено с правами администратора: {fileName}" : $"Запуск: {title}");
             _monitorTimer.Start();
         }
@@ -685,7 +698,7 @@ public partial class MainWindow : Window
 
     private string CreateRunLogPath()
     {
-        var runDirectory = Path.Combine(_engineRoot, "WinSweepRuns");
+        var runDirectory = Path.Combine(_engineRoot, "KappaSweepRuns");
         Directory.CreateDirectory(runDirectory);
         foreach (var oldLog in new DirectoryInfo(runDirectory).GetFiles("run-*.log")
                      .OrderByDescending(file => file.LastWriteTime)
@@ -783,8 +796,8 @@ public partial class MainWindow : Window
         CheckForUpdatesButton.IsEnabled = false;
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/kappapr1der/winsweep/releases/latest");
-            request.Headers.TryAddWithoutValidation("User-Agent", "WinSweep-Control-Center");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/kappapr1der/kappasweep/releases/latest");
+            request.Headers.TryAddWithoutValidation("User-Agent", "KappaSweep-Control-Center");
             using var response = await UpdateClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             var release = JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject
@@ -841,7 +854,7 @@ public partial class MainWindow : Window
         if (_activeProcess is { HasExited: false })
         {
             e.Cancel = true;
-            AppendLog("Операция ещё выполняется. WinSweep останется открыт, чтобы контролировать её завершение.");
+            AppendLog("Операция ещё выполняется. KappaSweep останется открыт, чтобы контролировать её завершение.");
         }
         base.OnClosing(e);
     }

@@ -7,10 +7,12 @@ CodexWindowsCleanup/
 dist/
 .release-stage/
 .launcher-build/
-launcher/WinSweepPayload.zip
+launcher/KappaSweepPayload.zip
 release-notes.md
+KappaSweepRuns/
 WinSweepRuns/
-launcher/assets/winsweep-icon-source.png
+launcher/WinSweepPayload.zip
+launcher/assets/kappasweep-icon-source.png
 .dotnet-build-*.txt
 .desktop-native-update-*.txt
 .dotnet-tmp/

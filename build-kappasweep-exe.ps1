@@ -12,9 +12,9 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSCommandPath
 $launcherRoot = Join-Path $root "launcher"
-$project = Join-Path $launcherRoot "WinSweepLauncher.csproj"
+$project = Join-Path $launcherRoot "KappaSweepLauncher.csproj"
 $program = Join-Path $launcherRoot "Program.cs"
-$icon = Join-Path $launcherRoot "assets\winsweep.ico"
+$icon = Join-Path $launcherRoot "assets\kappasweep.ico"
 $payloadRootFull = [IO.Path]::GetFullPath($PayloadRoot)
 $outputFull = [IO.Path]::GetFullPath($OutputPath)
 
@@ -32,13 +32,13 @@ if (-not (Test-Path -LiteralPath $payloadRootFull -PathType Container)) {
 }
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
 if ($null -eq $dotnet) {
-    throw "dotnet SDK 8 or newer was not found. Install the .NET 8 SDK to build WinSweep.exe."
+    throw "dotnet SDK 8 or newer was not found. Install the .NET 8 SDK to build KappaSweep.exe."
 }
 
 $buildRoot = Join-Path $root ".launcher-build"
-$payloadZip = Join-Path $launcherRoot "WinSweepPayload.zip"
+$payloadZip = Join-Path $launcherRoot "KappaSweepPayload.zip"
 $publishRoot = Join-Path $buildRoot "publish"
-$builtExe = Join-Path $publishRoot "WinSweep.exe"
+$builtExe = Join-Path $publishRoot "KappaSweep.exe"
 
 if (Test-Path -LiteralPath $buildRoot) {
     Remove-Item -LiteralPath $buildRoot -Recurse -Force
@@ -79,13 +79,13 @@ try {
     }
 
     if (-not (Test-Path -LiteralPath $builtExe -PathType Leaf)) {
-        throw "C# compilation did not produce WinSweep.exe."
+        throw "C# compilation did not produce KappaSweep.exe."
     }
 
     $outputDirectory = Split-Path -Parent $outputFull
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     Copy-Item -LiteralPath $builtExe -Destination $outputFull -Force
-    Write-Host "WinSweep.exe created:"
+    Write-Host "KappaSweep.exe created:"
     Write-Host $outputFull
 }
 finally {

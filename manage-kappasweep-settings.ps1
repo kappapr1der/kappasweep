@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -17,7 +17,7 @@ function Resolve-ConfigPath {
     param([string]$Path)
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
-        return (Join-Path $PSScriptRoot "winsweep-config.json")
+        return (Join-Path $PSScriptRoot "kappasweep-config.json")
     }
 
     $expanded = [Environment]::ExpandEnvironmentVariables($Path)
@@ -350,7 +350,7 @@ function Invoke-ExclusionMenu {
 
 $resolvedPath = Resolve-ConfigPath -Path $ConfigPath
 if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
-    throw "Не найден winsweep-config.json: $resolvedPath"
+    throw "Не найден kappasweep-config.json: $resolvedPath"
 }
 
 $config = Get-Content -LiteralPath $resolvedPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -367,7 +367,7 @@ switch ($Section) {
     default {
         while ($true) {
             Clear-Host
-            Write-Host "== Настройки WinSweep ==" -ForegroundColor Green
+            Write-Host "== Настройки KappaSweep ==" -ForegroundColor Green
             Write-Host "1. Кэши программ"
             Write-Host "2. Пороги свободного места по дискам"
             Write-Host "3. Исключения"

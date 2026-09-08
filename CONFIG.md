@@ -1,8 +1,13 @@
-# Настройки WinSweep
+# Настройки KappaSweep
 
-В portable-версии WinSweep читает `winsweep-config.json` из скрытой папки
-`WinSweepData` рядом с EXE. В обычной EXE-сборке этот путь остаётся
-`%LOCALAPPDATA%\WinSweep\Engine`. Параметры, переданные внутреннему движку,
+При обновлении с WinSweep используется существующая папка `WinSweepData`
+(или `%LOCALAPPDATA%\WinSweep\Engine` для обычной сборки). Настройки из
+`winsweep-config.json` копируются в `kappasweep-config.json` один раз;
+последующие запуски сохраняют уже обновлённый конфиг.
+
+В portable-версии KappaSweep читает `kappasweep-config.json` из скрытой папки
+`KappaSweepData` рядом с EXE. В обычной EXE-сборке этот путь остаётся
+`%LOCALAPPDATA%\KappaSweep\Engine`. Параметры, переданные внутреннему движку,
 важнее значений из файла.
 
 Самый удобный способ менять настройки - вкладка `Кэши и правила` в GUI.
@@ -24,8 +29,8 @@
 - `thresholds.tempOlderThanDays`: возраст временных файлов для очистки.
 - `thresholds.cacheOlderThanDays`: возраст файлов кэша для очистки.
 - `paths.extraPathsFile`: обычно `extra-cache-paths.txt`.
-- `paths.logDir`: оставь пустым, чтобы WinSweep сам выбрал папку журналов.
-- `paths.excludedPaths`: папки, которые WinSweep никогда не удаляет.
+- `paths.logDir`: оставь пустым, чтобы KappaSweep сам выбрал папку журналов.
+- `paths.excludedPaths`: папки, которые KappaSweep никогда не удаляет.
 
 ## Кэши программ
 

@@ -1,11 +1,11 @@
 @echo off
 setlocal
-set "SCRIPT=%~dp0winsweep-ui.ps1"
+set "SCRIPT=%~dp0kappasweep-ui.ps1"
 set "POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 chcp 65001 >nul
 
 if not exist "%SCRIPT%" (
-    echo winsweep-ui.ps1 was not found next to this file.
+    echo kappasweep-ui.ps1 was not found next to this file.
     pause
     exit /b 1
 )
@@ -20,7 +20,7 @@ if not exist "%POWERSHELL%" (
 set "EXITCODE=%ERRORLEVEL%"
 if not "%EXITCODE%"=="0" (
     echo.
-    echo WinSweep Control Center exited with code %EXITCODE%.
+    echo KappaSweep Control Center exited with code %EXITCODE%.
     pause
 )
 exit /b %EXITCODE%

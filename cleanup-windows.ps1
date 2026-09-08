@@ -40,12 +40,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
 
-$script:WinSweepVersion = "1.2.2"
+$script:KappaSweepVersion = "1.3.0"
 $script:DeletedBytes = [int64]0
 $script:DeletedItems = 0
 $script:PotentialBytes = [int64]0
@@ -100,7 +100,7 @@ function Get-ConfigProperty {
     return $property.Value
 }
 
-function Resolve-WinSweepPath {
+function Resolve-KappaSweepPath {
     param([string]$Path)
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
@@ -291,7 +291,7 @@ function New-LogFolder {
     foreach ($candidate in $candidates) {
         try {
             New-Item -ItemType Directory -Path $candidate -Force -ErrorAction Stop | Out-Null
-            $testPath = Join-Path $candidate ".winsweep-write-test"
+            $testPath = Join-Path $candidate ".kappasweep-write-test"
             Set-Content -LiteralPath $testPath -Value "ok" -Encoding ASCII -ErrorAction Stop
             Remove-Item -LiteralPath $testPath -Force -ErrorAction SilentlyContinue
             return $candidate
@@ -305,13 +305,21 @@ function New-LogFolder {
 }
 
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
-    $defaultConfigPath = Join-Path $PSScriptRoot "winsweep-config.json"
+    $defaultConfigPath = Join-Path $PSScriptRoot "kappasweep-config.json"
     if (Test-Path -LiteralPath $defaultConfigPath -PathType Leaf -ErrorAction SilentlyContinue) {
         $ConfigPath = $defaultConfigPath
     }
 }
 else {
-    $ConfigPath = Resolve-WinSweepPath -Path $ConfigPath
+    $ConfigPath = Resolve-KappaSweepPath -Path $ConfigPath
+}
+
+# Existing scheduled tasks can still pass the pre-rebrand config path.
+if ([IO.Path]::GetFileName($ConfigPath) -ieq 'winsweep-config.json') {
+    $rebrandedConfig = Join-Path (Split-Path -Parent $ConfigPath) 'kappasweep-config.json'
+    if (Test-Path -LiteralPath $rebrandedConfig -PathType Leaf) {
+        $ConfigPath = $rebrandedConfig
+    }
 }
 
 $config = $null
@@ -384,12 +392,12 @@ if ($null -ne $config) {
 
     $configuredExtraPathsFile = Get-ConfigProperty -Object $paths -Name "extraPathsFile"
     if ($null -ne $configuredExtraPathsFile -and -not $script:CliParameters.ContainsKey("ExtraPathsFile")) {
-        $ExtraPathsFile = Resolve-WinSweepPath -Path ([string]$configuredExtraPathsFile)
+        $ExtraPathsFile = Resolve-KappaSweepPath -Path ([string]$configuredExtraPathsFile)
     }
 
     $configuredLogDir = Get-ConfigProperty -Object $paths -Name "logDir"
     if ($null -ne $configuredLogDir -and -not $script:CliParameters.ContainsKey("LogDir")) {
-        $LogDir = Resolve-WinSweepPath -Path ([string]$configuredLogDir)
+        $LogDir = Resolve-KappaSweepPath -Path ([string]$configuredLogDir)
     }
 
     Set-StringArrayFromConfig -Name "ExcludedPaths" -Value (Get-ConfigProperty -Object $paths -Name "excludedPaths")
@@ -555,10 +563,10 @@ function Get-CloseHint {
 
     $text = $Label.ToLowerInvariant()
     if ($text -match "spotify") {
-        return "Close Spotify and run the same WinSweep action again."
+        return "Close Spotify and run the same KappaSweep action again."
     }
     if ($text -match "telegram") {
-        return "Close Telegram Desktop and run the same WinSweep action again."
+        return "Close Telegram Desktop and run the same KappaSweep action again."
     }
     if ($text -match "chrome|edge|brave|firefox|browser") {
         return "Close browsers before browser-cache cleanup."
@@ -585,7 +593,7 @@ function Add-CloseHint {
 }
 
 function Add-AdminRetryHint {
-    $script:CloseHints["Run WinSweep as administrator if protected Windows or Store app caches are skipped."] = $true
+    $script:CloseHints["Run KappaSweep as administrator if protected Windows or Store app caches are skipped."] = $true
 }
 
 function Test-IsLockedResourceException {
@@ -881,7 +889,7 @@ function Write-HtmlReport {
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>WinSweep Report</title>
+  <title>KappaSweep Report</title>
   <style>
     :root { color-scheme: light; font-family: Segoe UI, Arial, sans-serif; }
     body { margin: 0; background: #f4f6f8; color: #17212b; }
@@ -907,8 +915,8 @@ function Write-HtmlReport {
 <body>
 <main>
   <header>
-    <h1>WinSweep Report</h1>
-    <div class="meta">Generated $generated | mode: $(ConvertTo-HtmlText $Mode) | profile: $(ConvertTo-HtmlText (Get-ProfileName)) | version: $script:WinSweepVersion</div>
+    <h1>KappaSweep Report</h1>
+    <div class="meta">Generated $generated | mode: $(ConvertTo-HtmlText $Mode) | profile: $(ConvertTo-HtmlText (Get-ProfileName)) | version: $script:KappaSweepVersion</div>
   </header>
   <div class="grid">
     <div class="metric">Selected reclaim<b>$(ConvertTo-HtmlText (Format-ByteSize $totalBytes))</b></div>
@@ -1156,7 +1164,7 @@ function Save-ScheduledGuardState {
         $state = [ordered]@{
             startedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
             processId = $PID
-            version = $script:WinSweepVersion
+            version = $script:KappaSweepVersion
         }
         $state | ConvertTo-Json | Set-Content -LiteralPath $script:ScheduledGuardStatePath -Encoding UTF8 -ErrorAction Stop
     }
@@ -1204,7 +1212,7 @@ function Show-CleanupNotification {
 
     try {
         $rows = @($script:TargetResults | Where-Object { $_.Bytes -gt 0 } | Sort-Object Bytes -Descending)
-        $title = "WinSweep: очистка завершена"
+        $title = "KappaSweep: очистка завершена"
         if ($script:DeletedItems -gt 0) {
             $notificationText = "Освобождено: $(Format-ByteSize $script:DeletedBytes). Удалено: $($script:DeletedItems) объектов."
             $categories = @(
@@ -1980,9 +1988,9 @@ if (-not [string]::IsNullOrWhiteSpace($script:ConfigSource)) {
     $introLines = @($introLines[0], $introLines[1], ("config: {0}" -f $script:ConfigSource), $introLines[2])
 }
 
-Write-Panel -Title "WinSweep" -Lines $introLines
+Write-Panel -Title "KappaSweep" -Lines $introLines
 
-Write-Log "Windows cleanup started. Version=$script:WinSweepVersion Profile=$(Get-ProfileName) Config=$script:ConfigSource Analyze=$Analyze Deep=$Deep DryRun=$DryRun SmartGuard=$SmartGuard ScheduledGuard=$ScheduledGuard GuardDrive=$GuardDrive MinFreeGB=$MinFreeGB MinFreePercent=$MinFreePercent AggressiveSafe=$AggressiveSafe BrowserCaches=$CleanBrowserCaches AppCaches=$CleanAppCaches SpotifyCache=$CleanSpotifyCache DiscordCache=$CleanDiscordCache TelegramCache=$CleanTelegramCache SlackCache=$CleanSlackCache TeamsCache=$CleanTeamsCache ZoomCache=$CleanZoomCache Registry=$CleanRegistry ExtraPaths=$CleanExtraPaths DeveloperCaches=$CleanDeveloperCaches GameCaches=$CleanGameCaches ClearRecycleBin=$ClearRecycleBin ExcludedPaths=$($script:ExcludedPaths.Count)"
+Write-Log "Windows cleanup started. Version=$script:KappaSweepVersion Profile=$(Get-ProfileName) Config=$script:ConfigSource Analyze=$Analyze Deep=$Deep DryRun=$DryRun SmartGuard=$SmartGuard ScheduledGuard=$ScheduledGuard GuardDrive=$GuardDrive MinFreeGB=$MinFreeGB MinFreePercent=$MinFreePercent AggressiveSafe=$AggressiveSafe BrowserCaches=$CleanBrowserCaches AppCaches=$CleanAppCaches SpotifyCache=$CleanSpotifyCache DiscordCache=$CleanDiscordCache TelegramCache=$CleanTelegramCache SlackCache=$CleanSlackCache TeamsCache=$CleanTeamsCache ZoomCache=$CleanZoomCache Registry=$CleanRegistry ExtraPaths=$CleanExtraPaths DeveloperCaches=$CleanDeveloperCaches GameCaches=$CleanGameCaches ClearRecycleBin=$ClearRecycleBin ExcludedPaths=$($script:ExcludedPaths.Count)"
 Write-Log "Log file: $LogFile" -Detail
 if (-not [string]::IsNullOrWhiteSpace($script:ConfigLoadWarning)) {
     Write-Log $script:ConfigLoadWarning "WARN"

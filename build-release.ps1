@@ -11,7 +11,7 @@ $root = Split-Path -Parent $PSCommandPath
 $cleanupScript = Join-Path $root "cleanup-windows.ps1"
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $text = Get-Content -LiteralPath $cleanupScript -Raw -Encoding UTF8
-    if ($text -match 'WinSweepVersion\s*=\s*"([^"]+)"') {
+    if ($text -match 'KappaSweepVersion\s*=\s*"([^"]+)"') {
         $Version = $Matches[1]
     }
     else {
@@ -21,7 +21,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 
 $dist = Join-Path $root "dist"
 $stageRoot = Join-Path $root ".release-stage"
-$stageName = if ($Portable) { "WinSweep-Portable-v$Version" } else { "WinSweep-v$Version" }
+$stageName = if ($Portable) { "KappaSweep-Portable-v$Version" } else { "KappaSweep-v$Version" }
 $stage = Join-Path $stageRoot $stageName
 
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
@@ -29,7 +29,7 @@ if (Test-Path -LiteralPath $stageRoot) {
     $stageRootFull = [IO.Path]::GetFullPath($stageRoot)
     $rootFull = [IO.Path]::GetFullPath($root)
     if (-not $stageRootFull.StartsWith($rootFull, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to clear stage outside WinSweep root: $stageRootFull"
+        throw "Refusing to clear stage outside KappaSweep root: $stageRootFull"
     }
     Remove-Item -LiteralPath $stageRoot -Recurse -Force
 }
@@ -37,11 +37,11 @@ New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 $files = @(
     "cleanup-windows.ps1",
-    "winsweep-config.json",
-    "winsweep-menu.bat",
-    "winsweep-ui.ps1",
-    "winsweep-ui.bat",
-    "winsweep-encoding.ps1",
+    "kappasweep-config.json",
+    "kappasweep-menu.bat",
+    "kappasweep-ui.ps1",
+    "kappasweep-ui.bat",
+    "kappasweep-encoding.ps1",
     "system-tweaks.ps1",
     "check-log-encoding.ps1",
     "check-log-encoding.bat",
@@ -62,8 +62,8 @@ $files = @(
     "open-report-in-chrome.ps1",
     "repair-powershell-shortcut.ps1",
     "repair-powershell-shortcut.bat",
-    "manage-winsweep-settings.ps1",
-    "manage-winsweep-settings.bat",
+    "manage-kappasweep-settings.ps1",
+    "manage-kappasweep-settings.bat",
     "system-maintenance-check.ps1",
     "system-maintenance-check.bat",
     "show-cleanup-history.ps1",
@@ -83,11 +83,12 @@ $files = @(
     "setup-desktop-folder.ps1",
     "setup-desktop-folder.bat",
     "extra-cache-paths.txt",
-    "winsweep-icon.png",
+    "kappasweep-icon.png",
     "README.md",
     "CONFIG.md",
     "RELEASES.md",
-    "build-winsweep-exe.ps1"
+    "release-highlights.md",
+    "build-kappasweep-exe.ps1"
 )
 
 foreach ($file in $files) {
@@ -97,14 +98,14 @@ foreach ($file in $files) {
     }
 }
 
-$exeBuilder = Join-Path $root "build-winsweep-exe.ps1"
-$exeName = if ($Portable) { "WinSweep-Portable.exe" } else { "WinSweep.exe" }
+$exeBuilder = Join-Path $root "build-kappasweep-exe.ps1"
+$exeName = if ($Portable) { "KappaSweep-Portable.exe" } else { "KappaSweep.exe" }
 $exePath = Join-Path $stage $exeName
 $distExePath = Join-Path $dist $exeName
 & $exeBuilder -PayloadRoot $stage -OutputPath $exePath -Portable:$Portable
 Copy-Item -LiteralPath $exePath -Destination $distExePath -Force
 
-$zipName = if ($Portable) { "WinSweep-Portable-v$Version.zip" } else { "WinSweep-v$Version.zip" }
+$zipName = if ($Portable) { "KappaSweep-Portable-v$Version.zip" } else { "KappaSweep-v$Version.zip" }
 $zipPath = Join-Path $dist $zipName
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
@@ -112,7 +113,7 @@ if (Test-Path -LiteralPath $zipPath) {
 
 $publicStage = Join-Path $stageRoot "public"
 New-Item -ItemType Directory -Path $publicStage -Force | Out-Null
-Copy-Item -LiteralPath $exePath -Destination (Join-Path $publicStage "WinSweep.exe") -Force
+Copy-Item -LiteralPath $exePath -Destination (Join-Path $publicStage "KappaSweep.exe") -Force
 foreach ($publicFile in @("README.md", "CONFIG.md")) {
     Copy-Item -LiteralPath (Join-Path $stage $publicFile) -Destination (Join-Path $publicStage $publicFile) -Force
 }

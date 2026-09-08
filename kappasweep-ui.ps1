@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -17,9 +17,9 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
-$script:WinSweepVersion = "1.2.2"
+$script:KappaSweepVersion = "1.3.0"
 $script:PowerShellPath = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-$script:ConfigPath = Join-Path $PSScriptRoot "winsweep-config.json"
+$script:ConfigPath = Join-Path $PSScriptRoot "kappasweep-config.json"
 $script:ActiveProcess = $null
 $script:ActiveAction = ""
 $script:ActiveRunLogPath = ""
@@ -37,7 +37,7 @@ if (-not (Test-Path -LiteralPath $script:PowerShellPath -PathType Leaf)) {
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="WinSweep Control Center"
+        Title="KappaSweep Control Center"
         Width="1120" Height="840" MinWidth="900" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="#F4F7F8"
@@ -84,7 +84,7 @@ $xaml = @'
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="WinSweep" FontSize="30" FontWeight="SemiBold" Foreground="#172B32"/>
+                <TextBlock Text="KappaSweep" FontSize="30" FontWeight="SemiBold" Foreground="#172B32"/>
                 <TextBlock Text="Control Center · одна кнопка для безопасной очистки, места и настроек" FontSize="14" Foreground="#5A6B72" Margin="0,4,0,0"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -165,7 +165,7 @@ $xaml = @'
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Text="Что разрешено очищать" FontSize="20" FontWeight="SemiBold" Foreground="#172B32" Margin="0,0,0,6"/>
-                    <TextBlock Grid.Row="1" Text="Переключатели сохраняются в winsweep-config.json и применяются планировщиком." Foreground="#5A6B72" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="1" Text="Переключатели сохраняются в kappasweep-config.json и применяются планировщиком." Foreground="#5A6B72" Margin="0,0,0,10"/>
                     <ScrollViewer Grid.Row="1" Margin="0,34,0,10" VerticalScrollBarVisibility="Auto">
                         <WrapPanel x:Name="CachePanel"/>
                     </ScrollViewer>
@@ -238,7 +238,7 @@ $xaml = @'
 '@
 
 $window = [Windows.Markup.XamlReader]::Parse($xaml)
-$windowIconPath = Join-Path $PSScriptRoot 'winsweep-icon.png'
+$windowIconPath = Join-Path $PSScriptRoot 'kappasweep-icon.png'
 if (Test-Path -LiteralPath $windowIconPath -PathType Leaf) {
     $windowIcon = New-Object Windows.Media.Imaging.BitmapImage
     $windowIcon.BeginInit()
@@ -287,7 +287,7 @@ function Add-Log {
 
 function Read-Config {
     if (-not (Test-Path -LiteralPath $script:ConfigPath -PathType Leaf)) {
-        throw "winsweep-config.json was not found: $script:ConfigPath"
+        throw "kappasweep-config.json was not found: $script:ConfigPath"
     }
     $script:Config = Get-Content -LiteralPath $script:ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
 }
@@ -395,7 +395,7 @@ function Refresh-CacheControls {
     }
 }
 
-function Get-WinSweepLogDirectories {
+function Get-KappaSweepLogDirectories {
     $paths = New-Object System.Collections.ArrayList
     $programDataLog = if ([string]::IsNullOrWhiteSpace($env:ProgramData)) { '' } else { Join-Path $env:ProgramData 'CodexWindowsCleanup\Logs' }
     $tempLog = if ([string]::IsNullOrWhiteSpace($env:TEMP)) { '' } else { Join-Path $env:TEMP 'CodexWindowsCleanup\Logs' }
@@ -502,7 +502,7 @@ function Get-CleanupRunSummary {
 
 function Get-CleanupRunSummaries {
     $files = New-Object System.Collections.ArrayList
-    foreach ($directory in Get-WinSweepLogDirectories) {
+    foreach ($directory in Get-KappaSweepLogDirectories) {
         Get-ChildItem -LiteralPath $directory -Filter 'cleanup-*.log' -File -ErrorAction SilentlyContinue |
             ForEach-Object { [void]$files.Add($_) }
     }
@@ -575,7 +575,7 @@ function Get-ScheduleHealth {
         return [pscustomobject]@{ IsHealthy = $false; Summary = 'Есть задача с кодом ошибки.'; Detail = 'Проверь журналы и переустанови задачу: ' + (($resultProblems | Select-Object -Unique) -join ', ') + '.'; LastRun = $lastRunValue; NextRun = $nextRunValue }
     }
 
-    return [pscustomobject]@{ IsHealthy = $true; Summary = 'Задачи подключены к текущему движку.'; Detail = 'Путь всех трёх задач совпадает с текущим WinSweepData.'; LastRun = $lastRunValue; NextRun = $nextRunValue }
+    return [pscustomobject]@{ IsHealthy = $true; Summary = 'Задачи подключены к текущему движку.'; Detail = 'Путь всех трёх задач совпадает с текущим KappaSweepData.'; LastRun = $lastRunValue; NextRun = $nextRunValue }
 }
 
 function Refresh-Summary {
@@ -677,7 +677,7 @@ function ConvertTo-PowerShellLiteral {
 function ConvertTo-PowerShellInvocationArgument {
     param([string]$Value)
 
-    # WinSweep passes only its own fixed parameter names unquoted; all values stay quoted.
+    # KappaSweep passes only its own fixed parameter names unquoted; all values stay quoted.
     if ($Value -match '^-[A-Za-z][A-Za-z0-9]*$') {
         return $Value
     }
@@ -729,7 +729,7 @@ function Set-ActionState {
     }
 }
 
-function Complete-WinSweepAction {
+function Complete-KappaSweepAction {
     param(
         [int]$ExitCode,
         [string]$ActionTitle,
@@ -763,7 +763,7 @@ function Complete-WinSweepAction {
     }
 }
 
-function Get-WinSweepActionGuard {
+function Get-KappaSweepActionGuard {
     param(
         [string]$FileName,
         [string[]]$ScriptArguments = @()
@@ -790,7 +790,7 @@ function Get-WinSweepActionGuard {
     }
 }
 
-function Stop-WinSweepActionForGuard {
+function Stop-KappaSweepActionForGuard {
     param(
         [System.Diagnostics.Process]$Process,
         [string]$ActionTitle,
@@ -810,12 +810,12 @@ function Stop-WinSweepActionForGuard {
         Add-Log ("Не удалось остановить дерево процесса: " + $_.Exception.Message)
     }
 
-    Add-WinSweepRunLogLines -Path $RunLogPath
-    Complete-WinSweepAction -ExitCode 124 -ActionTitle $ActionTitle -Elevated:$Elevated
+    Add-KappaSweepRunLogLines -Path $RunLogPath
+    Complete-KappaSweepAction -ExitCode 124 -ActionTitle $ActionTitle -Elevated:$Elevated
 }
 
-function New-WinSweepRunLogPath {
-    $runLogDirectory = Join-Path $PSScriptRoot 'WinSweepRuns'
+function New-KappaSweepRunLogPath {
+    $runLogDirectory = Join-Path $PSScriptRoot 'KappaSweepRuns'
     New-Item -ItemType Directory -Path $runLogDirectory -Force | Out-Null
     Get-ChildItem -LiteralPath $runLogDirectory -Filter 'run-*.log' -File -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
@@ -824,7 +824,7 @@ function New-WinSweepRunLogPath {
     return Join-Path $runLogDirectory ("run-{0}-{1}.log" -f (Get-Date).ToString('yyyyMMdd-HHmmss'), [Guid]::NewGuid().ToString('N'))
 }
 
-function Add-WinSweepRunLogLines {
+function Add-KappaSweepRunLogLines {
     param([string]$Path)
 
     if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -838,7 +838,7 @@ function Add-WinSweepRunLogLines {
     $script:ActiveRunLineCount = $lines.Count
 }
 
-function Start-WinSweepProcessMonitor {
+function Start-KappaSweepProcessMonitor {
     param(
         [System.Diagnostics.Process]$Process,
         [string]$ActionTitle,
@@ -852,28 +852,28 @@ function Start-WinSweepProcessMonitor {
     $timer.Interval = [TimeSpan]::FromMilliseconds(180)
     $timer.Add_Tick({
         try {
-            Add-WinSweepRunLogLines -Path $RunLogPath
+            Add-KappaSweepRunLogLines -Path $RunLogPath
             if ($Process.HasExited) {
-                Add-WinSweepRunLogLines -Path $RunLogPath
-                Complete-WinSweepAction -ExitCode $Process.ExitCode -ActionTitle $ActionTitle -Elevated:$Elevated
+                Add-KappaSweepRunLogLines -Path $RunLogPath
+                Complete-KappaSweepAction -ExitCode $Process.ExitCode -ActionTitle $ActionTitle -Elevated:$Elevated
                 return
             }
 
             $Process.Refresh()
             if (((Get-Date) - $StartedAt) -gt $Guard.Timeout) {
-                Stop-WinSweepActionForGuard -Process $Process -ActionTitle $ActionTitle -Reason ("Превышен лимит времени $([int]$Guard.Timeout.TotalMinutes) мин.") -Elevated:$Elevated -RunLogPath $RunLogPath
+                Stop-KappaSweepActionForGuard -Process $Process -ActionTitle $ActionTitle -Reason ("Превышен лимит времени $([int]$Guard.Timeout.TotalMinutes) мин.") -Elevated:$Elevated -RunLogPath $RunLogPath
                 return
             }
 
             if ($Process.WorkingSet64 -gt $Guard.WorkingSetLimitBytes) {
                 $memoryGB = [math]::Round($Process.WorkingSet64 / 1GB, 2)
-                Stop-WinSweepActionForGuard -Process $Process -ActionTitle $ActionTitle -Reason ("Память процесса достигла $memoryGB ГБ.") -Elevated:$Elevated -RunLogPath $RunLogPath
+                Stop-KappaSweepActionForGuard -Process $Process -ActionTitle $ActionTitle -Reason ("Память процесса достигла $memoryGB ГБ.") -Elevated:$Elevated -RunLogPath $RunLogPath
             }
         }
         catch {
             Add-Log ("ОШИБКА мониторинга ${ActionTitle}: " + $_.Exception.Message)
             if ($Process.HasExited) {
-                Complete-WinSweepAction -ExitCode $Process.ExitCode -ActionTitle $ActionTitle -Elevated:$Elevated
+                Complete-KappaSweepAction -ExitCode $Process.ExitCode -ActionTitle $ActionTitle -Elevated:$Elevated
             }
         }
     }.GetNewClosure())
@@ -882,7 +882,7 @@ function Start-WinSweepProcessMonitor {
     $timer.Start()
 }
 
-function Start-WinSweepScript {
+function Start-KappaSweepScript {
     param(
         [string]$FileName,
         [string[]]$ScriptArguments = @(),
@@ -894,14 +894,14 @@ function Start-WinSweepScript {
         return
     }
     $actionTitle = Get-ActionTitle -FileName $FileName
-    $guard = Get-WinSweepActionGuard -FileName $FileName -ScriptArguments $ScriptArguments
+    $guard = Get-KappaSweepActionGuard -FileName $FileName -ScriptArguments $ScriptArguments
     $target = Join-Path $PSScriptRoot $FileName
     if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
         Add-Log "Файл не найден: $target"
         return
     }
     try {
-        $runLogPath = New-WinSweepRunLogPath
+        $runLogPath = New-KappaSweepRunLogPath
         $script:ActiveRunLogPath = $runLogPath
         $script:ActiveRunLineCount = 0
         $openRunLogButton.IsEnabled = $true
@@ -930,13 +930,13 @@ function Start-WinSweepScript {
     $startedAt = Get-Date
     $script:ActiveActionStartedAt = $startedAt
     $script:ActiveActionGuard = $guard
-    Set-ActionState -Running $true -Message ("Выполняется: $actionTitle. Не закрывай WinSweep.")
+    Set-ActionState -Running $true -Message ("Выполняется: $actionTitle. Не закрывай KappaSweep.")
     if ($Elevated) {
         try {
             $process = Start-Process -FilePath $script:PowerShellPath -ArgumentList (ConvertTo-ProcessArguments $args) -Verb RunAs -PassThru -ErrorAction Stop
             $script:ActiveProcess = $process
             $script:ActiveAction = $actionTitle
-            Start-WinSweepProcessMonitor -Process $process -ActionTitle $actionTitle -Elevated -RunLogPath $runLogPath -StartedAt $startedAt -Guard $guard
+            Start-KappaSweepProcessMonitor -Process $process -ActionTitle $actionTitle -Elevated -RunLogPath $runLogPath -StartedAt $startedAt -Guard $guard
             Add-Log "Запущено с правами администратора: $FileName. Подтверди UAC, затем прогресс останется здесь."
         }
         catch {
@@ -961,7 +961,7 @@ function Start-WinSweepScript {
         }
         $script:ActiveProcess = $process
         $script:ActiveAction = $actionTitle
-        Start-WinSweepProcessMonitor -Process $process -ActionTitle $actionTitle -RunLogPath $runLogPath -StartedAt $startedAt -Guard $guard
+        Start-KappaSweepProcessMonitor -Process $process -ActionTitle $actionTitle -RunLogPath $runLogPath -StartedAt $startedAt -Guard $guard
         Add-Log "Запуск: $actionTitle"
     }
     catch {
@@ -981,7 +981,7 @@ function Open-ExternalPath {
 function Open-RunLog {
     $path = $script:ActiveRunLogPath
     if ([string]::IsNullOrWhiteSpace($path) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        $runLogDirectory = Join-Path $PSScriptRoot 'WinSweepRuns'
+        $runLogDirectory = Join-Path $PSScriptRoot 'KappaSweepRuns'
         $latest = Get-ChildItem -LiteralPath $runLogDirectory -Filter 'run-*.log' -File -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
@@ -999,32 +999,32 @@ Refresh-Drives
 Refresh-CacheControls
 Refresh-Summary
 Refresh-SystemSummary
-Add-Log "Control Center v$script:WinSweepVersion готов."
+Add-Log "Control Center v$script:KappaSweepVersion готов."
 
 $controls = @{
     RefreshButton = { Refresh-Drives; Refresh-Summary; Refresh-SystemSummary; Add-Log "Данные обновлены." }
     OpenFolderButton = { Open-ExternalPath -Path $PSScriptRoot }
-    RecommendedCleanupButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    RetryLockedCleanupButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    AnalyzeButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Analyze','-Profile','Emergency','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    SafeCleanupButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    SmartCleanupButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-SmartGuard','-AggressiveSafe','-CleanDeveloperCaches','-CleanRegistry','-ConfigPath',$script:ConfigPath) }
-    SpaceHogButton = { Start-WinSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
-    OpenReportButton = { Start-WinSweepScript -FileName 'open-latest-report.ps1' }
-    HistoryButton = { Start-WinSweepScript -FileName 'show-cleanup-history.ps1' }
+    RecommendedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
+    RetryLockedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
+    AnalyzeButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Analyze','-Profile','Emergency','-OpenReport','-ConfigPath',$script:ConfigPath) }
+    SafeCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-OpenReport','-ConfigPath',$script:ConfigPath) }
+    SmartCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-SmartGuard','-AggressiveSafe','-CleanDeveloperCaches','-CleanRegistry','-ConfigPath',$script:ConfigPath) }
+    SpaceHogButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
+    OpenReportButton = { Start-KappaSweepScript -FileName 'open-latest-report.ps1' }
+    HistoryButton = { Start-KappaSweepScript -FileName 'show-cleanup-history.ps1' }
     SaveSettingsButton = { Save-Config; Refresh-Summary }
     OpenConfigButton = { Start-Process -FilePath 'notepad.exe' -ArgumentList ('"{0}"' -f $script:ConfigPath) }
-    InstallScheduleButton = { Start-WinSweepScript -FileName 'install-scheduled-cleanup.ps1' -ScriptArguments @('-ConfigPath',$script:ConfigPath) -Elevated }
-    RepairShortcutButton = { Start-WinSweepScript -FileName 'repair-powershell-shortcut.ps1' }
-    SystemStatusButton = { Start-WinSweepScript -FileName 'system-maintenance-check.ps1' }
-    AnalyzeComponentStoreButton = { Start-WinSweepScript -FileName 'system-maintenance-check.ps1' -ScriptArguments @('-AnalyzeComponentStore') -Elevated }
-    DeepMaintenanceButton = { Start-WinSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Deep','-OpenReport','-ConfigPath',$script:ConfigPath) -Elevated }
-    DisableHibernationButton = { Start-WinSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-DisableHibernation') -Elevated; Refresh-SystemSummary }
-    EnableHibernationButton = { Start-WinSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-EnableHibernation') -Elevated; Refresh-SystemSummary }
-    LogEncodingButton = { Start-WinSweepScript -FileName 'check-log-encoding.ps1' }
-    SpaceReportButton = { Start-WinSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
-    OpenLatestReportButton = { Start-WinSweepScript -FileName 'open-latest-report.ps1' }
-    ShowHistoryButton = { Start-WinSweepScript -FileName 'show-cleanup-history.ps1' }
+    InstallScheduleButton = { Start-KappaSweepScript -FileName 'install-scheduled-cleanup.ps1' -ScriptArguments @('-ConfigPath',$script:ConfigPath) -Elevated }
+    RepairShortcutButton = { Start-KappaSweepScript -FileName 'repair-powershell-shortcut.ps1' }
+    SystemStatusButton = { Start-KappaSweepScript -FileName 'system-maintenance-check.ps1' }
+    AnalyzeComponentStoreButton = { Start-KappaSweepScript -FileName 'system-maintenance-check.ps1' -ScriptArguments @('-AnalyzeComponentStore') -Elevated }
+    DeepMaintenanceButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Deep','-OpenReport','-ConfigPath',$script:ConfigPath) -Elevated }
+    DisableHibernationButton = { Start-KappaSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-DisableHibernation') -Elevated; Refresh-SystemSummary }
+    EnableHibernationButton = { Start-KappaSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-EnableHibernation') -Elevated; Refresh-SystemSummary }
+    LogEncodingButton = { Start-KappaSweepScript -FileName 'check-log-encoding.ps1' }
+    SpaceReportButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
+    OpenLatestReportButton = { Start-KappaSweepScript -FileName 'open-latest-report.ps1' }
+    ShowHistoryButton = { Start-KappaSweepScript -FileName 'show-cleanup-history.ps1' }
     OpenLogsButton = { Open-ExternalPath -Path (Join-Path $env:ProgramData 'CodexWindowsCleanup\Logs') }
     OpenRunLogButton = { Open-RunLog }
 }
@@ -1054,13 +1054,13 @@ foreach ($entry in $controls.GetEnumerator()) {
 }
 
 if ($Test) {
-    $safeGuard = Get-WinSweepActionGuard -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile', 'Safe')
-    $deepGuard = Get-WinSweepActionGuard -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile', 'Deep')
-    $spaceGuard = Get-WinSweepActionGuard -FileName 'space-hog-report.ps1'
+    $safeGuard = Get-KappaSweepActionGuard -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile', 'Safe')
+    $deepGuard = Get-KappaSweepActionGuard -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile', 'Deep')
+    $spaceGuard = Get-KappaSweepActionGuard -FileName 'space-hog-report.ps1'
     if ($safeGuard.Timeout.TotalMinutes -ne 12 -or $deepGuard.Timeout.TotalMinutes -ne 45 -or $spaceGuard.Timeout.TotalMinutes -ne 15 -or $safeGuard.WorkingSetLimitBytes -ne [int64]1.5GB) {
-        throw 'WinSweep action guard test failed.'
+        throw 'KappaSweep action guard test failed.'
     }
-    Write-Output ("WINSWEEP_UI_TEST_OK controls={0} caches={1} version={2} guardMB={3}" -f $controls.Count, $script:CacheCheckboxes.Count, $script:WinSweepVersion, [math]::Round($safeGuard.WorkingSetLimitBytes / 1MB))
+    Write-Output ("KAPPASWEEP_UI_TEST_OK controls={0} caches={1} version={2} guardMB={3}" -f $controls.Count, $script:CacheCheckboxes.Count, $script:KappaSweepVersion, [math]::Round($safeGuard.WorkingSetLimitBytes / 1MB))
     return
 }
 

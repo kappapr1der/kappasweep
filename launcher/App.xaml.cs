@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace WinSweepLauncher;
+namespace KappaSweepLauncher;
 
 public partial class App : Application
 {

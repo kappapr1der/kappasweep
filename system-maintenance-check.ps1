@@ -6,7 +6,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -54,7 +54,7 @@ function Get-ShadowStorageInfo {
 }
 
 Write-Host ""
-Write-Host "== WinSweep system maintenance check ==" -ForegroundColor Green
+Write-Host "== KappaSweep system maintenance check ==" -ForegroundColor Green
 Write-Host "This screen only inspects storage. It does not disable hibernation, remove restore points, or clean Windows components." -ForegroundColor DarkGray
 
 $systemDrive = if ([string]::IsNullOrWhiteSpace($env:SystemDrive)) { "C:" } else { $env:SystemDrive }

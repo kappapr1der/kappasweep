@@ -7,7 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$encodingHelper = Join-Path $PSScriptRoot "winsweep-encoding.ps1"
+$encodingHelper = Join-Path $PSScriptRoot "kappasweep-encoding.ps1"
 if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
@@ -73,7 +73,7 @@ function Test-Utf8File {
 }
 
 $resolvedLogDir = Resolve-LogDir -Preferred $LogDir
-Write-Host "== WinSweep: проверка кодировки логов ==" -ForegroundColor Green
+Write-Host "== KappaSweep: проверка кодировки логов ==" -ForegroundColor Green
 Write-Host "Папка: $resolvedLogDir" -ForegroundColor DarkGray
 
 if (-not (Test-Path -LiteralPath $resolvedLogDir -PathType Container)) {
@@ -116,5 +116,5 @@ if ($bad.Count -eq 0) {
     exit 0
 }
 
-Write-Warning "Проблемные или подозрительные файлы: $($bad.Count). Новые логи WinSweep не переписывались автоматически."
+Write-Warning "Проблемные или подозрительные файлы: $($bad.Count). Новые логи KappaSweep не переписывались автоматически."
 exit 1
