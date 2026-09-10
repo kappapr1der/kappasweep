@@ -1,0 +1,16 @@
+name: Actions Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Safe smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm runner execution
+        run: echo "GitHub Actions smoke test OK"
