@@ -17,7 +17,7 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
-$script:KappaSweepVersion = "1.3.0"
+$script:KappaSweepVersion = "1.3.2"
 $script:PowerShellPath = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 $script:ConfigPath = Join-Path $PSScriptRoot "kappasweep-config.json"
 $script:ActiveProcess = $null
@@ -75,7 +75,7 @@ $xaml = @'
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="220"/>
+            <RowDefinition Height="0"/>
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Margin="0,0,0,20">
@@ -107,9 +107,9 @@ $xaml = @'
                     </Grid.RowDefinitions>
                     <TextBlock Text="Быстрые действия" FontSize="20" FontWeight="SemiBold" Foreground="#172B32" Margin="0,0,0,14"/>
                     <WrapPanel Grid.Row="1">
-                        <Button x:Name="RecommendedCleanupButton" Content="Очистить безопасно" FontWeight="SemiBold" Padding="20,11"/>
+                        <Button x:Name="RecommendedCleanupButton" Content="Проверить и очистить" ToolTip="Безопасная очистка при достижении порога свободного места" FontWeight="SemiBold" Padding="20,11"/>
                         <Button x:Name="AnalyzeButton" Content="Анализ очистки"/>
-                        <Button x:Name="SafeCleanupButton" Content="Безопасная очистка"/>
+                        <Button x:Name="SafeCleanupButton" Content="Очистить сейчас" ToolTip="Безопасная очистка независимо от свободного места"/>
                         <Button x:Name="SmartCleanupButton" Content="Умная очистка"/>
                         <Button x:Name="SpaceHogButton" Content="Пожиратели места"/>
                         <Button x:Name="OpenReportButton" Content="Последний отчёт" Style="{StaticResource SecondaryButton}"/>
@@ -204,21 +204,28 @@ $xaml = @'
                     <TextBlock Text="Pressure Guard запускает безопасную очистку только при достижении порогов свободного места. Глубокая еженедельная задача остаётся отдельной." TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,14,0,0"/>
                 </StackPanel>
             </TabItem>
-            <TabItem Header="Отчёты и история">
-                <StackPanel Margin="18">
+            <TabItem x:Name="ReportsTab" Header="Отчёты и история">
+                <Grid Margin="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel>
                     <TextBlock Text="Отчёты" FontSize="20" FontWeight="SemiBold" Foreground="#172B32"/>
-                    <TextBlock Text="Все отчёты остаются локальными. HTML открывается в Chrome, если он установлен." Foreground="#5A6B72" Margin="0,8,0,18"/>
                     <WrapPanel>
                         <Button x:Name="SpaceReportButton" Content="Диагностика места"/>
-                        <Button x:Name="OpenLatestReportButton" Content="Открыть последний HTML" Style="{StaticResource SecondaryButton}"/>
+                        <Button x:Name="OpenLatestReportButton" Content="Последний отчёт" Style="{StaticResource SecondaryButton}"/>
                         <Button x:Name="ShowHistoryButton" Content="Показать историю" Style="{StaticResource SecondaryButton}"/>
                         <Button x:Name="OpenLogsButton" Content="Открыть логи" Style="{StaticResource SecondaryButton}"/>
                     </WrapPanel>
-                </StackPanel>
+                    </StackPanel>
+                    <TextBlock x:Name="LocalReportSummary" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <DataGrid x:Name="LocalReportGrid" Grid.Row="2" IsReadOnly="True" AutoGenerateColumns="True" CanUserAddRows="False"/>
+                </Grid>
             </TabItem>
-        </TabControl>
-
-        <Border Grid.Row="3" Background="#172B32" Padding="14" Margin="0,18,0,0">
+            <TabItem x:Name="JournalTab" Header="Журнал">
+        <Border Background="#172B32" Padding="14" Margin="18">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -233,6 +240,8 @@ $xaml = @'
                 <TextBox Grid.Row="1" x:Name="LogBox" Background="#0E1D22" Foreground="#D9F1ED" BorderThickness="0" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8" Margin="0,10,0,0"/>
             </Grid>
         </Border>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
 '@
@@ -377,6 +386,7 @@ function Refresh-CacheControls {
         browserCaches = 'Браузеры (только когда закрыты)'
         developerCaches = 'Инструменты разработки'
         gameCaches = 'Игровые лаунчеры'
+        nvidiaInstallers = 'Установщики NVIDIA'
         notifyOnPressure = 'Уведомления с итогом очистки'
     }
     foreach ($entry in $labels.GetEnumerator()) {
@@ -713,6 +723,7 @@ function Set-ActionState {
     )
 
     $activityProgress.IsIndeterminate = $Running
+    if ($Running) { (Get-Control 'MainTabs').SelectedItem = Get-Control 'JournalTab' }
     if (-not $Running) {
         $activityProgress.Value = 0
     }
@@ -750,7 +761,7 @@ function Complete-KappaSweepAction {
     $script:ActiveRunLineCount = 0
     $script:ActiveActionStartedAt = $null
     $script:ActiveActionGuard = $null
-    $result = if ($ExitCode -eq 0) { "Готово: $ActionTitle." } else { "$ActionTitle завершено с кодом $ExitCode. Проверь журнал ниже." }
+    $result = if ($ExitCode -eq 0) { "Готово: $ActionTitle." } else { "$ActionTitle завершено с кодом $ExitCode. Открой вкладку Журнал." }
     Set-ActionState -Running $false -Message $result
     Add-Log $result
     try {
@@ -1001,16 +1012,32 @@ Refresh-Summary
 Refresh-SystemSummary
 Add-Log "Control Center v$script:KappaSweepVersion готов."
 
+function Show-LocalReport {
+    $files = @(foreach ($directory in Get-KappaSweepLogDirectories) {
+        foreach ($folder in @($directory, (Join-Path $directory 'Reports'))) {
+            Get-ChildItem -LiteralPath $folder -File -Filter '*.json' -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(report-|space-hogs-)' }
+        }
+    })
+    $latest = $files | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    (Get-Control 'MainTabs').SelectedItem = Get-Control 'ReportsTab'
+    if ($null -eq $latest) { (Get-Control 'LocalReportSummary').Text = 'Отчётов пока нет.'; return }
+    if ($latest.Length -gt 8MB) { throw 'Отчёт превышает лимит 8 МБ.' }
+    $report = Get-Content -LiteralPath $latest.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    (Get-Control 'LocalReportSummary').Text = $latest.Name
+    (Get-Control 'LocalReportGrid').ItemsSource = @($report.results)
+}
+
 $controls = @{
     RefreshButton = { Refresh-Drives; Refresh-Summary; Refresh-SystemSummary; Add-Log "Данные обновлены." }
     OpenFolderButton = { Open-ExternalPath -Path $PSScriptRoot }
-    RecommendedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    RetryLockedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    AnalyzeButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Analyze','-Profile','Emergency','-OpenReport','-ConfigPath',$script:ConfigPath) }
-    SafeCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-OpenReport','-ConfigPath',$script:ConfigPath) }
+    RecommendedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-ConfigPath',$script:ConfigPath) }
+    RetryLockedCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-SmartGuard','-ConfigPath',$script:ConfigPath) }
+    AnalyzeButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Analyze','-Profile','Emergency','-ConfigPath',$script:ConfigPath) }
+    SafeCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Safe','-ConfigPath',$script:ConfigPath) }
     SmartCleanupButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-SmartGuard','-AggressiveSafe','-CleanDeveloperCaches','-CleanRegistry','-ConfigPath',$script:ConfigPath) }
-    SpaceHogButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
-    OpenReportButton = { Start-KappaSweepScript -FileName 'open-latest-report.ps1' }
+    SpaceHogButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12') }
+    OpenReportButton = { Show-LocalReport }
     HistoryButton = { Start-KappaSweepScript -FileName 'show-cleanup-history.ps1' }
     SaveSettingsButton = { Save-Config; Refresh-Summary }
     OpenConfigButton = { Start-Process -FilePath 'notepad.exe' -ArgumentList ('"{0}"' -f $script:ConfigPath) }
@@ -1018,14 +1045,14 @@ $controls = @{
     RepairShortcutButton = { Start-KappaSweepScript -FileName 'repair-powershell-shortcut.ps1' }
     SystemStatusButton = { Start-KappaSweepScript -FileName 'system-maintenance-check.ps1' }
     AnalyzeComponentStoreButton = { Start-KappaSweepScript -FileName 'system-maintenance-check.ps1' -ScriptArguments @('-AnalyzeComponentStore') -Elevated }
-    DeepMaintenanceButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Deep','-OpenReport','-ConfigPath',$script:ConfigPath) -Elevated }
+    DeepMaintenanceButton = { Start-KappaSweepScript -FileName 'cleanup-windows.ps1' -ScriptArguments @('-Profile','Deep','-ConfigPath',$script:ConfigPath) -Elevated }
     DisableHibernationButton = { Start-KappaSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-DisableHibernation') -Elevated; Refresh-SystemSummary }
     EnableHibernationButton = { Start-KappaSweepScript -FileName 'system-tweaks.ps1' -ScriptArguments @('-EnableHibernation') -Elevated; Refresh-SystemSummary }
     LogEncodingButton = { Start-KappaSweepScript -FileName 'check-log-encoding.ps1' }
-    SpaceReportButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12','-OpenReport') }
-    OpenLatestReportButton = { Start-KappaSweepScript -FileName 'open-latest-report.ps1' }
+    SpaceReportButton = { Start-KappaSweepScript -FileName 'space-hog-report.ps1' -ScriptArguments @('-Top','12') }
+    OpenLatestReportButton = { Show-LocalReport }
     ShowHistoryButton = { Start-KappaSweepScript -FileName 'show-cleanup-history.ps1' }
-    OpenLogsButton = { Open-ExternalPath -Path (Join-Path $env:ProgramData 'CodexWindowsCleanup\Logs') }
+    OpenLogsButton = { (Get-Control 'MainTabs').SelectedItem = Get-Control 'JournalTab' }
     OpenRunLogButton = { Open-RunLog }
 }
 

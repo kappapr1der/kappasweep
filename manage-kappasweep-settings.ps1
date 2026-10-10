@@ -200,6 +200,10 @@ function Get-CacheSwitches {
                 (Join-Path $localAppData "Riot Games\Riot Client\Data\Cache")
             )
         }
+        [pscustomobject]@{
+            Key = "nvidiaInstallers"; Name = "Установщики NVIDIA"; Description = "Устаревшие пакеты; установленная и самая новая версии сохраняются";
+            Patterns = @()
+        }
     )
 }
 
@@ -214,6 +218,12 @@ function Show-CacheSwitches {
         $enabled = [bool](Get-ConfigProperty -Object $Features -Name $item.Key)
         $paths = @(Get-ExistingCachePaths -Patterns $item.Patterns)
         $size = if ($paths.Count -gt 0) { Format-ByteSize (Measure-CachePaths -Paths $paths) } else { "не найден" }
+        if ($item.Key -eq 'nvidiaInstallers') {
+            . (Join-Path $PSScriptRoot 'nvidia-installer-cache.ps1')
+            $nvidiaBytes = [int64]0
+            Invoke-NvidiaInstallerCache | ForEach-Object { $nvidiaBytes += $_.Bytes }
+            $size = Format-ByteSize $nvidiaBytes
+        }
         $mark = if ($enabled) { "x" } else { " " }
         Write-Host ("{0}. [{1}] {2} - {3}" -f ($index + 1), $mark, $item.Name, $size)
     }

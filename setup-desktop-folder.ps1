@@ -70,6 +70,9 @@ if ($exeSource) {
 
 $files = @(
     "cleanup-windows.ps1",
+    "nvidia-installer-cache.ps1",
+    "spotify-cache-guard.ps1",
+    "install-spotify-cache-guard.ps1",
     "install-scheduled-cleanup.ps1",
     "kappasweep-menu.bat",
     "kappasweep-ui.ps1",

@@ -41,6 +41,7 @@
     "extraPaths": false,
     "developerCaches": true,
     "gameCaches": true,
+    "nvidiaInstallers": false,
     "clearRecycleBin": false,
     "notifyOnPressure": true
   },

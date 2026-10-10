@@ -18,6 +18,7 @@ param(
     [switch]$CleanExtraPaths,
     [switch]$CleanDeveloperCaches,
     [switch]$CleanGameCaches,
+    [switch]$CleanNvidiaInstallers,
     [switch]$ClearRecycleBin,
     [switch]$Detailed,
     [switch]$Quiet,
@@ -45,7 +46,7 @@ if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
 
-$script:KappaSweepVersion = "1.3.0"
+$script:KappaSweepVersion = "1.3.2"
 $script:DeletedBytes = [int64]0
 $script:DeletedItems = 0
 $script:PotentialBytes = [int64]0
@@ -381,6 +382,7 @@ if ($null -ne $config) {
     Set-SwitchFromConfig -Name "CleanExtraPaths" -Value (Get-ConfigProperty -Object $features -Name "extraPaths")
     Set-SwitchFromConfig -Name "CleanDeveloperCaches" -Value (Get-ConfigProperty -Object $features -Name "developerCaches")
     Set-SwitchFromConfig -Name "CleanGameCaches" -Value (Get-ConfigProperty -Object $features -Name "gameCaches")
+    Set-SwitchFromConfig -Name "CleanNvidiaInstallers" -Value (Get-ConfigProperty -Object $features -Name "nvidiaInstallers")
     Set-SwitchFromConfig -Name "ClearRecycleBin" -Value (Get-ConfigProperty -Object $features -Name "clearRecycleBin")
     Set-SwitchFromConfig -Name "NotifyOnPressure" -Value (Get-ConfigProperty -Object $features -Name "notifyOnPressure")
 
@@ -510,6 +512,7 @@ function Get-TargetCategory {
     if ($text -match "npm|yarn|pnpm|pip|poetry|nuget|gradle") {
         return "developer"
     }
+    if ($text -match "nvidia installers") { return "installer" }
     if ($text -match "nvidia|amd|directx|opengl|shader") {
         return "graphics"
     }
@@ -528,6 +531,7 @@ function Get-TargetRisk {
     switch ($Category) {
         "developer" { return "medium" }
         "game" { return "medium" }
+        "installer" { return "medium" }
         "extra" { return "custom" }
         default { return "safe" }
     }
@@ -958,6 +962,21 @@ function Write-HtmlReport {
 
         Set-Content -LiteralPath $reportPath -Value $html -Encoding UTF8 -ErrorAction Stop
         Copy-Item -LiteralPath $reportPath -Destination $latestPath -Force -ErrorAction Stop
+        $jsonPath = [IO.Path]::ChangeExtension($reportPath, '.json')
+        [ordered]@{
+            schemaVersion = 1
+            kind = 'cleanup'
+            generated = (Get-Date).ToString('o')
+            version = $script:KappaSweepVersion
+            mode = $Mode
+            profile = (Get-ProfileName)
+            totalBytes = $totalBytes
+            totalItems = $totalItems
+            before = $Before
+            after = $After
+            results = $allRows
+            tips = @($script:CloseHints.Keys | Sort-Object)
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding UTF8 -ErrorAction Stop
         $script:HtmlReportPath = $reportPath
         Write-Log "HTML report saved: $reportPath"
 
@@ -2109,6 +2128,30 @@ foreach ($target in $targets) {
 
     $seen[$key] = $true
     Remove-OldContents -Label $target.Label -Path $target.Path -OlderThanDays $target.Days
+}
+
+if ($CleanNvidiaInstallers) {
+    try {
+        . (Join-Path $PSScriptRoot 'nvidia-installer-cache.ps1')
+        foreach ($result in (Invoke-NvidiaInstallerCache -Apply:(-not $DryRun) -ExcludedPaths $script:ExcludedPaths)) {
+            $label = "NVIDIA installers $($result.Version)"
+            Write-Log ("{0}: {1}; {2}; {3}" -f $label, $result.Status, (Format-ByteSize $result.Bytes), $result.Message)
+            if ($DryRun) {
+                $script:PotentialBytes += $result.Bytes
+                $script:PotentialItems += $result.Items
+            } else {
+                $script:DeletedBytes += $result.Bytes
+                $script:DeletedItems += $result.Items
+            }
+            if ($result.Status -eq 'partial') { $script:FailedItems += $result.Failures }
+            if ($result.Status -eq 'skipped') { $script:LockedItems++ }
+            Add-CleanupResult -Label $label -Path $result.Path -Days 1 -Bytes $result.Bytes -Items $result.Items -Failures $result.Failures -Status $result.Status
+        }
+    }
+    catch {
+        Write-Log "NVIDIA installer cleanup failed: $($_.Exception.Message)" "ERROR"
+        $script:FailedItems++
+    }
 }
 
 Invoke-RegistryCleanup

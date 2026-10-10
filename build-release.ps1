@@ -37,6 +37,9 @@ New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 $files = @(
     "cleanup-windows.ps1",
+    "nvidia-installer-cache.ps1",
+    "spotify-cache-guard.ps1",
+    "install-spotify-cache-guard.ps1",
     "kappasweep-config.json",
     "kappasweep-menu.bat",
     "kappasweep-ui.ps1",

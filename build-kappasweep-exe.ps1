@@ -39,6 +39,10 @@ $buildRoot = Join-Path $root ".launcher-build"
 $payloadZip = Join-Path $launcherRoot "KappaSweepPayload.zip"
 $publishRoot = Join-Path $buildRoot "publish"
 $builtExe = Join-Path $publishRoot "KappaSweep.exe"
+$rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
+if (-not [IO.Path]::GetFullPath($buildRoot).StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to clear build directory outside the repository."
+}
 
 if (Test-Path -LiteralPath $buildRoot) {
     Remove-Item -LiteralPath $buildRoot -Recurse -Force

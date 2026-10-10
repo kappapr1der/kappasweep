@@ -18,7 +18,7 @@ namespace KappaSweepLauncher;
 
 public partial class MainWindow : Window
 {
-    private const string Version = "1.3.0";
+    private const string Version = "1.3.2";
     private const long WorkingSetLimitBytes = 1536L * 1024 * 1024;
     private static readonly HttpClient UpdateClient = new() { Timeout = TimeSpan.FromSeconds(8) };
 
@@ -35,8 +35,12 @@ public partial class MainWindow : Window
     private DateTime _activeStartedAt;
     private string? _activeTitle;
     private string? _activeRunLogPath;
-    private string? _latestReleaseUrl;
-    private int _runLogReadChars;
+    private ReleaseUpdate? _availableUpdate;
+    private bool _updating;
+    private string? _activeScript;
+    private StreamReader? _runReader;
+    private string _liveLog = "";
+    private bool _refreshingFiles;
 
     public MainWindow(string engineRoot)
     {
@@ -62,7 +66,7 @@ public partial class MainWindow : Window
         var expected = new[]
         {
             "cleanup-windows.ps1", "kappasweep-config.json", "space-hog-report.ps1",
-            "system-maintenance-check.ps1", "install-scheduled-cleanup.ps1"
+            "system-maintenance-check.ps1", "install-scheduled-cleanup.ps1", "nvidia-installer-cache.ps1"
         };
         var engineIsValid = expected.All(file => File.Exists(Path.Combine(engineRoot, file)))
             && GetActionGuard("cleanup-windows.ps1", new[] { "-Profile", "Safe" }).Timeout == TimeSpan.FromMinutes(12)
@@ -78,7 +82,24 @@ public partial class MainWindow : Window
         try
         {
             var window = new MainWindow(engineRoot);
-            var uiIsValid = window.Title == "KappaSweep Control Center" && window._cacheCheckboxes.Count == 10;
+            var uiIsValid = window.Title == "KappaSweep Control Center" && window._cacheCheckboxes.Count == 11
+                && window.MainTabs.Items.Count == 6
+                && (string)window.RecommendedCleanupButton.Content == "Проверить и очистить"
+                && (string)window.SafeCleanupButton.Content == "Очистить сейчас";
+            window._availableUpdate = new ReleaseUpdate("v9.0.0", new Uri("https://github.com/kappapr1der/kappasweep"), 1, new string('0', 64));
+            window.RefreshUpdateButton();
+            uiIsValid &= (string)window.CheckForUpdatesButton.Content == "Обновить";
+            window._availableUpdate = null;
+            window.RefreshUpdateButton();
+            uiIsValid &= (string)window.CheckForUpdatesButton.Content == "Проверить обновление";
+            window.ShowReports();
+            uiIsValid &= window.MainTabs.SelectedItem == window.ReportsTab;
+            window.LiveJournalButton_Click(window, new RoutedEventArgs());
+            window.AppendLog("Проверка журнала: русский текст.");
+            uiIsValid &= window.MainTabs.SelectedItem == window.JournalTab && window.LogBox.Text.Contains("русский текст.");
+            window.SetActionState(true, "Проверка блокировки действий");
+            uiIsValid &= !window.CheckForUpdatesButton.IsEnabled && !window.SafeCleanupButton.IsEnabled;
+            window.SetActionState(false, "Готово");
             window.Close();
             return uiIsValid;
         }
@@ -88,7 +109,7 @@ public partial class MainWindow : Window
         }
     }
 
-    public static bool RunRenderSmokeTest(string engineRoot, string? renderOutput = null)
+    public static bool RunRenderSmokeTest(string engineRoot, string? renderOutput = null, string? tab = null, bool compact = false)
     {
         var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         var rendered = false;
@@ -107,8 +128,18 @@ public partial class MainWindow : Window
                 Left = -10000,
                 Top = -10000,
                 Opacity = 0.01,
-                ShowInTaskbar = false
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual
             };
+            if (compact) { window.Width = 900; window.Height = 700; }
+            if (tab == "journal") window.LiveJournalButton_Click(window, new RoutedEventArgs());
+            if (tab == "reports") window.ShowReports();
+            if (tab == "history") window.ShowReports(history: true);
+            if (tab == "update")
+            {
+                window._availableUpdate = new ReleaseUpdate("v9.0.0", new Uri("https://github.com/kappapr1der/kappasweep"), 1, new string('0', 64));
+                window.RefreshUpdateButton();
+            }
             window.Loaded += (_, _) =>
             {
                 rendered = true;
@@ -123,7 +154,14 @@ public partial class MainWindow : Window
                         var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
                             (int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight),
                             96, 96, PixelFormats.Pbgra32);
-                        bitmap.Render(content);
+                        var visual = new DrawingVisual();
+                        using (var drawing = visual.RenderOpen())
+                        {
+                            var bounds = new Rect(0, 0, content.ActualWidth, content.ActualHeight);
+                            drawing.DrawRectangle(window.Background, null, bounds);
+                            drawing.DrawRectangle(new VisualBrush(content), null, bounds);
+                        }
+                        bitmap.Render(visual);
                         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
                         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
                         using var stream = File.Create(renderOutput);
@@ -147,6 +185,84 @@ public partial class MainWindow : Window
             {
                 application.Shutdown();
             }
+        }
+    }
+
+    public static bool RunInteractionSmokeTest(string engineRoot)
+    {
+        var testRoot = Path.Combine(Path.GetTempPath(), "KappaSweep-ui-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(testRoot);
+        var logRoot = Path.Combine(testRoot, "Logs");
+        var reportRoot = Path.Combine(logRoot, "Reports");
+        Directory.CreateDirectory(reportRoot);
+        var config = JsonNode.Parse(File.ReadAllText(Path.Combine(engineRoot, "kappasweep-config.json"))) as JsonObject ?? new JsonObject();
+        GetObject(config, "paths")["logDir"] = logRoot;
+        File.WriteAllText(Path.Combine(testRoot, "kappasweep-config.json"), config.ToJsonString());
+        var reportPath = Path.Combine(reportRoot, "report-ui-test.json");
+        File.WriteAllText(Path.Combine(testRoot, "cleanup-windows.ps1"), $$"""
+            Write-Output 'Живой журнал: тест без очистки.'
+            Start-Sleep -Milliseconds 500
+            '{"schemaVersion":1,"kind":"cleanup","mode":"Clean","profile":"Safe","totalBytes":1024,"totalItems":1,"results":[{"Label":"Тестовый кэш","Bytes":1024,"Status":"cleaned","Path":"D:\\test"}]}' | Set-Content -LiteralPath {{QuotePowerShellLiteral(reportPath)}} -Encoding UTF8
+            Write-Output 'Тестовый отчёт готов.'
+            exit 0
+            """, new UTF8Encoding(true));
+        File.WriteAllText(Path.Combine(testRoot, "failure.ps1"), "Write-Output 'Искусственная ошибка, без изменения дисков.'; exit 7", new UTF8Encoding(true));
+        var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        MainWindow? window = null;
+        var passed = false;
+        var phase = 0;
+        var started = DateTime.UtcNow;
+        try
+        {
+            window = new MainWindow(testRoot)
+            {
+                Left = -10000, Top = -10000, Opacity = 0.01, ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual
+            };
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            timer.Tick += (_, _) =>
+            {
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(30))
+                {
+                    timer.Stop();
+                    application.Shutdown(1);
+                    return;
+                }
+                if (window._activeProcess is not null) return;
+                if (phase == 0)
+                {
+                    if (window.MainTabs.SelectedItem != window.ReportsTab
+                        || !window.ReportSummaryText.Text.StartsWith("Очищено")
+                        || window.ReportGrid.Items.Count != 1
+                        || !window._liveLog.Contains("Живой журнал")
+                        || !window.IsLoaded) { timer.Stop(); application.Shutdown(1); return; }
+                    phase = 1;
+                    window.StartAction("Тест ошибки", "failure.ps1");
+                }
+                else
+                {
+                    passed = window.MainTabs.SelectedItem == window.JournalTab
+                        && window.LogBox.Text.Contains("кодом 7") && window.SafeCleanupButton.IsEnabled && window.IsLoaded;
+                    timer.Stop();
+                    window.Close();
+                    application.Shutdown();
+                }
+            };
+            window.Loaded += (_, _) => { window.StartAction("Тест отчёта", "cleanup-windows.ps1"); timer.Start(); };
+            application.Run(window);
+            return passed;
+        }
+        finally
+        {
+            if (window?._activeProcess is { HasExited: false } process)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+            }
+            window?._runReader?.Dispose();
+            application.Shutdown();
+            var tempPrefix = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (Path.GetFullPath(testRoot).StartsWith(tempPrefix, StringComparison.OrdinalIgnoreCase)) Directory.Delete(testRoot, recursive: true);
         }
     }
 
@@ -196,6 +312,7 @@ public partial class MainWindow : Window
             RefreshSummary();
             RefreshSystemSummary();
             RefreshHistorySummary();
+            RefreshLocalFiles();
             if (showLog)
             {
                 AppendLog("Данные обновлены.");
@@ -260,7 +377,8 @@ public partial class MainWindow : Window
             ("spotifyCache", "Spotify (автоочистка отключена)"), ("discordCache", "Discord"), ("telegramCache", "Telegram Desktop"),
             ("slackCache", "Slack"), ("teamsCache", "Microsoft Teams"), ("zoomCache", "Zoom"),
             ("browserCaches", "Браузеры (только когда закрыты)"), ("developerCaches", "Инструменты разработки"),
-            ("gameCaches", "Игровые лаунчеры"), ("notifyOnPressure", "Уведомления с итогом очистки")
+            ("gameCaches", "Игровые лаунчеры"), ("nvidiaInstallers", "Установщики NVIDIA"),
+            ("notifyOnPressure", "Уведомления с итогом очистки")
         };
 
         foreach (var (key, label) in labels)
@@ -277,6 +395,10 @@ public partial class MainWindow : Window
                 checkBox.ToolTip = "Spotify исключён из автоматической очистки: Store-версия смешивает кэш с данными интерфейса.";
             }
             CachePanel.Children.Add(checkBox);
+            if (key == "nvidiaInstallers")
+            {
+                checkBox.ToolTip = "Старые загрузки драйверов. Сохраняются установленная и самая новая версии; свежие и активные пакеты пропускаются.";
+            }
             _cacheCheckboxes[key] = checkBox;
         }
     }
@@ -357,7 +479,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var lines = File.ReadAllLines(latest.FullName, Encoding.UTF8);
+            var lines = LocalReports.ReadLogTail(latest.FullName).Split('\n');
             var finish = lines.LastOrDefault(line => line.Contains("Windows cleanup finished", StringComparison.OrdinalIgnoreCase));
             if (string.IsNullOrWhiteSpace(finish))
             {
@@ -463,7 +585,7 @@ public partial class MainWindow : Window
             string[] lines;
             try
             {
-                lines = File.ReadAllLines(log.FullName, Encoding.UTF8);
+                lines = LocalReports.ReadLogTail(log.FullName).Split('\n');
             }
             catch
             {
@@ -531,7 +653,11 @@ public partial class MainWindow : Window
         try
         {
             _activeRunLogPath = CreateRunLogPath();
-            _runLogReadChars = 0;
+            _runReader?.Dispose();
+            _runReader = null;
+            _activeScript = fileName;
+            JournalSelector.SelectedIndex = 0;
+            MainTabs.SelectedItem = JournalTab;
             OpenRunLogButton.IsEnabled = true;
             var command = BuildInvocationCommand(scriptPath, arguments, _activeRunLogPath);
             var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
@@ -655,17 +781,27 @@ public partial class MainWindow : Window
     {
         AppendNewRunOutput();
         var title = _activeTitle ?? "Действие";
+        var showReport = exitCode == 0 && (_activeScript == "cleanup-windows.ps1" || _activeScript == "space-hog-report.ps1");
+        var started = _activeStartedAt.ToLocalTime();
+        _runReader?.Dispose();
+        _runReader = null;
         _monitorTimer.Stop();
         _activeProcess?.Dispose();
         _activeProcess = null;
         _activeGuard = null;
         _activeTitle = null;
+        _activeScript = null;
         var result = exitCode == 0
             ? $"Готово: {title}."
-            : $"{title} завершено с кодом {exitCode}. Проверь журнал ниже.";
+            : $"{title} завершено с кодом {exitCode}. Открой вкладку «Журнал».";
         SetActionState(false, result);
         AppendLog(result);
         RefreshAll(showLog: false);
+        if (showReport && ReportSelector.Items.Count > 0 && ReportSelector.Items[0] is LocalFile latest && latest.Time >= started.AddSeconds(-1))
+        {
+            ReportSelector.SelectedIndex = 0;
+            if (MainTabs.SelectedItem == JournalTab) MainTabs.SelectedItem = ReportsTab;
+        }
     }
 
     private void AppendNewRunOutput()
@@ -677,17 +813,13 @@ public partial class MainWindow : Window
 
         try
         {
-            using var stream = new FileStream(_activeRunLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            using var reader = new StreamReader(stream, Encoding.UTF8, true);
-            var content = reader.ReadToEnd();
-            if (content.Length < _runLogReadChars)
+            _runReader ??= new StreamReader(new FileStream(_activeRunLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite), Encoding.UTF8, true);
+            var buffer = new char[16_384];
+            for (var block = 0; block < 4; block++)
             {
-                _runLogReadChars = 0;
-            }
-            if (content.Length > _runLogReadChars)
-            {
-                AppendRawLog(content[_runLogReadChars..]);
-                _runLogReadChars = content.Length;
+                var count = _runReader.Read(buffer, 0, buffer.Length);
+                if (count == 0) break;
+                AppendRawLog(new string(buffer, 0, count));
             }
         }
         catch (IOException)
@@ -715,13 +847,14 @@ public partial class MainWindow : Window
     private void SetActionState(bool running, string message)
     {
         ActivityProgress.IsIndeterminate = running;
-        ActivityStatusText.Text = running ? "Выполняется" : "Готово";
+        ActivityStatusText.Text = message;
         ActivitySummaryText.Text = message;
         ActivitySummaryText.Foreground = BrushFrom(running ? "#C47A22" : "#147D78");
         foreach (var button in _actionButtons)
         {
             button.IsEnabled = !running;
         }
+        CheckForUpdatesButton.IsEnabled = !running && !_updating;
     }
 
     private static ActionGuard GetActionGuard(string fileName, IEnumerable<string> arguments)
@@ -759,12 +892,16 @@ public partial class MainWindow : Window
         {
             return;
         }
-        LogBox.AppendText(text);
-        if (LogBox.Text.Length > 150_000)
+        _liveLog += text;
+        if (_liveLog.Length > 150_000)
         {
-            LogBox.Text = LogBox.Text[^100_000..];
+            _liveLog = _liveLog[^100_000..];
         }
-        LogBox.ScrollToEnd();
+        if (JournalSelector.SelectedIndex <= 0)
+        {
+            LogBox.Text = _liveLog;
+            LogBox.ScrollToEnd();
+        }
     }
 
     private void SaveSettings()
@@ -793,7 +930,15 @@ public partial class MainWindow : Window
 
     private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
     {
-        CheckForUpdatesButton.IsEnabled = false;
+        if (_updating || _activeProcess is { HasExited: false }) return;
+        if (_availableUpdate is not null)
+        {
+            await InstallUpdateAsync(_availableUpdate);
+            return;
+        }
+        _updating = true;
+        SetActionState(true, "Проверяю обновления…");
+        CheckForUpdatesButton.Content = "Проверяю…";
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/kappapr1der/kappasweep/releases/latest");
@@ -802,56 +947,81 @@ public partial class MainWindow : Window
             response.EnsureSuccessStatusCode();
             var release = JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject
                 ?? throw new InvalidDataException("GitHub returned an invalid release response.");
-            var tag = release["tag_name"]?.GetValue<string>()?.Trim() ?? string.Empty;
-            var url = release["html_url"]?.GetValue<string>()?.Trim() ?? string.Empty;
-            if (IsNewerRelease(tag))
+#if PORTABLE
+            const bool portable = true;
+#else
+            const bool portable = false;
+#endif
+            _availableUpdate = ReleaseUpdate.Parse(release, Version, portable);
+            if (_availableUpdate is not null)
             {
-                _latestReleaseUrl = url;
-                OpenLatestReleaseButton.IsEnabled = !string.IsNullOrWhiteSpace(_latestReleaseUrl);
-                ActivitySummaryText.Text = $"Доступно обновление {tag}. Открой релиз, чтобы скачать portable-версию.";
-                ActivitySummaryText.Foreground = BrushFrom("#147D78");
-                AppendLog("Доступно обновление: " + tag);
+                SetActionState(false, $"Доступна версия {_availableUpdate.Tag}.");
+                AppendLog("Доступно обновление: " + _availableUpdate.Tag);
             }
             else
             {
-                _latestReleaseUrl = string.Empty;
-                OpenLatestReleaseButton.IsEnabled = false;
-                ActivitySummaryText.Text = $"Установлена актуальная версия v{Version}.";
-                ActivitySummaryText.Foreground = BrushFrom("#147D78");
+                SetActionState(false, $"Установлена версия v{Version}. Более новой опубликованной версии нет.");
                 AppendLog("Проверка обновлений: установлена актуальная версия.");
             }
         }
         catch (Exception exception)
         {
-            ActivitySummaryText.Text = "Не удалось проверить обновление. Проверь подключение к GitHub.";
-            ActivitySummaryText.Foreground = BrushFrom("#C47A22");
+            SetActionState(false, "Проверка обновления не удалась. Подробности во вкладке «Журнал».");
             AppendLog("ОШИБКА проверки обновлений: " + exception.Message);
         }
         finally
         {
-            CheckForUpdatesButton.IsEnabled = true;
+            _updating = false;
+            RefreshUpdateButton();
         }
     }
 
-    private void OpenLatestReleaseButton_Click(object sender, RoutedEventArgs e)
+    private void RefreshUpdateButton()
     {
-        if (!string.IsNullOrWhiteSpace(_latestReleaseUrl))
+        CheckForUpdatesButton.Content = _availableUpdate is null ? "Проверить обновление" : "Обновить";
+        CheckForUpdatesButton.ToolTip = _availableUpdate is null ? "Проверить новые версии на GitHub" : $"Установить {_availableUpdate.Tag}; настройки и расписание сохранятся";
+        CheckForUpdatesButton.IsEnabled = !_updating && _activeProcess is not { HasExited: false };
+    }
+
+    private async System.Threading.Tasks.Task InstallUpdateAsync(ReleaseUpdate update)
+    {
+        if (MessageBox.Show($"Установить {update.Tag}? KappaSweep перезапустится. Настройки, отчёты и задачи останутся на месте.",
+                "Обновление KappaSweep", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        _updating = true;
+        SetActionState(true, "Загрузка обновления…");
+        MainTabs.SelectedItem = JournalTab;
+        try
         {
-            OpenExternalPath(_latestReleaseUrl);
+            var target = Environment.ProcessPath ?? throw new InvalidOperationException("Не определён путь EXE.");
+            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KappaSweep", "Updates", Guid.NewGuid().ToString("N"));
+            var progress = new Progress<int>(percent =>
+            {
+                CheckForUpdatesButton.Content = $"Загрузка {percent}%";
+                ActivityStatusText.Text = $"Загрузка обновления: {percent}%";
+            });
+            var source = await update.DownloadAsync(folder, progress);
+            var command = ReleaseUpdate.BuildInstallCommand(Environment.ProcessId, source, target, folder);
+            using var installer = Process.Start(new ProcessStartInfo
+            {
+                FileName = _powerShellPath,
+                Arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(command)),
+                UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden
+            }) ?? throw new InvalidOperationException("Не удалось запустить установку.");
+            _updating = false;
+            Application.Current.Shutdown();
         }
-    }
-
-    private static bool IsNewerRelease(string tag)
-    {
-        var candidate = tag.Trim().TrimStart('v', 'V');
-        return System.Version.TryParse(candidate, out var latest)
-            && System.Version.TryParse(Version, out var installed)
-            && latest > installed;
+        catch (Exception exception)
+        {
+            _updating = false;
+            SetActionState(false, "Обновление не установлено. Текущая версия не изменена. Подробности в журнале.");
+            AppendLog("ОШИБКА обновления: " + exception.Message);
+            RefreshUpdateButton();
+        }
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        if (_activeProcess is { HasExited: false })
+        if (_updating || _activeProcess is { HasExited: false })
         {
             e.Cancel = true;
             AppendLog("Операция ещё выполняется. KappaSweep останется открыт, чтобы контролировать её завершение.");
@@ -896,32 +1066,103 @@ public partial class MainWindow : Window
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e) => RefreshAll();
     private void OpenFolderButton_Click(object sender, RoutedEventArgs e) => OpenExternalPath(_engineRoot);
-    private void RecommendedCleanupButton_Click(object sender, RoutedEventArgs e) => StartAction("Очистка", "cleanup-windows.ps1", false, "-Profile", "Safe", "-SmartGuard", "-OpenReport", "-ConfigPath", _configPath);
-    private void AnalyzeButton_Click(object sender, RoutedEventArgs e) => StartAction("Анализ очистки", "cleanup-windows.ps1", false, "-Analyze", "-Profile", "Emergency", "-OpenReport", "-ConfigPath", _configPath);
-    private void SafeCleanupButton_Click(object sender, RoutedEventArgs e) => StartAction("Безопасная очистка", "cleanup-windows.ps1", false, "-Profile", "Safe", "-OpenReport", "-ConfigPath", _configPath);
+    private void RecommendedCleanupButton_Click(object sender, RoutedEventArgs e) => StartAction("Проверка и очистка", "cleanup-windows.ps1", false, "-Profile", "Safe", "-SmartGuard", "-ConfigPath", _configPath);
+    private void AnalyzeButton_Click(object sender, RoutedEventArgs e) => StartAction("Анализ очистки", "cleanup-windows.ps1", false, "-Analyze", "-Profile", "Emergency", "-ConfigPath", _configPath);
+    private void SafeCleanupButton_Click(object sender, RoutedEventArgs e) => StartAction("Безопасная очистка", "cleanup-windows.ps1", false, "-Profile", "Safe", "-ConfigPath", _configPath);
     private void SmartCleanupButton_Click(object sender, RoutedEventArgs e) => StartAction("Умная очистка", "cleanup-windows.ps1", false, "-SmartGuard", "-AggressiveSafe", "-CleanDeveloperCaches", "-CleanRegistry", "-ConfigPath", _configPath);
-    private void SpaceHogButton_Click(object sender, RoutedEventArgs e) => StartAction("Анализ места", "space-hog-report.ps1", false, "-Top", "12", "-OpenReport");
-    private void OpenReportButton_Click(object sender, RoutedEventArgs e) => StartAction("Последний отчёт", "open-latest-report.ps1");
-    private void HistoryButton_Click(object sender, RoutedEventArgs e) => StartAction("История", "show-cleanup-history.ps1");
+    private void SpaceHogButton_Click(object sender, RoutedEventArgs e) => StartAction("Анализ места", "space-hog-report.ps1", false, "-Top", "12");
+    private void OpenReportButton_Click(object sender, RoutedEventArgs e) => ShowReports();
+    private void HistoryButton_Click(object sender, RoutedEventArgs e) => ShowReports(history: true);
     private void SaveSettingsButton_Click(object sender, RoutedEventArgs e) => SaveSettings();
     private void OpenConfigButton_Click(object sender, RoutedEventArgs e) => OpenExternalPath(_configPath);
     private void SystemStatusButton_Click(object sender, RoutedEventArgs e) => StartAction("Проверка системы", "system-maintenance-check.ps1");
     private void AnalyzeComponentStoreButton_Click(object sender, RoutedEventArgs e) => StartAction("Анализ хранилища компонентов", "system-maintenance-check.ps1", true, "-AnalyzeComponentStore");
-    private void DeepMaintenanceButton_Click(object sender, RoutedEventArgs e) => StartAction("Глубокое обслуживание", "cleanup-windows.ps1", true, "-Profile", "Deep", "-OpenReport", "-ConfigPath", _configPath);
+    private void DeepMaintenanceButton_Click(object sender, RoutedEventArgs e) => StartAction("Глубокое обслуживание", "cleanup-windows.ps1", true, "-Profile", "Deep", "-ConfigPath", _configPath);
     private void DisableHibernationButton_Click(object sender, RoutedEventArgs e) => StartAction("Отключение гибернации", "system-tweaks.ps1", true, "-DisableHibernation");
     private void EnableHibernationButton_Click(object sender, RoutedEventArgs e) => StartAction("Включение гибернации", "system-tweaks.ps1", true, "-EnableHibernation");
     private void LogEncodingButton_Click(object sender, RoutedEventArgs e) => StartAction("Проверка кодировки", "check-log-encoding.ps1");
     private void InstallScheduleButton_Click(object sender, RoutedEventArgs e) => StartAction("Настройка Планировщика", "install-scheduled-cleanup.ps1", true, "-ConfigPath", _configPath);
     private void RepairShortcutButton_Click(object sender, RoutedEventArgs e) => StartAction("Починка ярлыков", "repair-powershell-shortcut.ps1");
-    private void SpaceReportButton_Click(object sender, RoutedEventArgs e) => StartAction("Диагностика места", "space-hog-report.ps1", false, "-Top", "12", "-OpenReport");
-    private void OpenLatestReportButton_Click(object sender, RoutedEventArgs e) => StartAction("Последний HTML", "open-latest-report.ps1");
-    private void ShowHistoryButton_Click(object sender, RoutedEventArgs e) => StartAction("История", "show-cleanup-history.ps1");
-    private void OpenLogsButton_Click(object sender, RoutedEventArgs e) => OpenExternalPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CodexWindowsCleanup", "Logs"));
+    private void SpaceReportButton_Click(object sender, RoutedEventArgs e) => StartAction("Диагностика места", "space-hog-report.ps1", false, "-Top", "12");
+    private void OpenLatestReportButton_Click(object sender, RoutedEventArgs e) => ShowReports();
+    private void ShowHistoryButton_Click(object sender, RoutedEventArgs e) => ShowReports(history: true);
+    private void OpenLogsButton_Click(object sender, RoutedEventArgs e) => LiveJournalButton_Click(sender, e);
     private void OpenRunLogButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(_activeRunLogPath) && File.Exists(_activeRunLogPath))
+        var path = (JournalSelector.SelectedItem as LocalFile)?.Path ?? _activeRunLogPath;
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
         {
-            OpenExternalPath(_activeRunLogPath);
+            OpenExternalPath(path);
         }
+    }
+
+    private string[] LogFolders() => new[]
+    {
+        GetString(GetObject(_config, "paths"), "logDir", ""),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CodexWindowsCleanup", "Logs"),
+        Path.Combine(Path.GetTempPath(), "CodexWindowsCleanup", "Logs")
+    }.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray();
+
+    private void RefreshLocalFiles()
+    {
+        var reportPath = (ReportSelector.SelectedItem as LocalFile)?.Path;
+        var journalPath = (JournalSelector.SelectedItem as LocalFile)?.Path;
+        var reports = LocalReports.Find(LogFolders().SelectMany(folder => new[] { folder, Path.Combine(folder, "Reports") }), reports: true);
+        if (reports.Count == 0) reports = LocalReports.Find(LogFolders(), reports: false);
+        _refreshingFiles = true;
+        ReportSelector.ItemsSource = reports;
+        ReportSelector.SelectedItem = reports.FirstOrDefault(file => file.Path == reportPath) ?? reports.FirstOrDefault();
+        var journals = new[] { new LocalFile("Текущий запуск", null, DateTime.Now) }.Concat(
+            LocalReports.Find(LogFolders().Append(Path.Combine(_engineRoot, "KappaSweepRuns")), reports: false)).ToArray();
+        JournalSelector.ItemsSource = journals;
+        JournalSelector.SelectedItem = journals.FirstOrDefault(file => file.Path == journalPath) ?? journals[0];
+        _refreshingFiles = false;
+        ReportSelector_SelectionChanged(ReportSelector, null!);
+        JournalSelector_SelectionChanged(JournalSelector, null!);
+    }
+
+    private void ShowReports(bool history = false)
+    {
+        RefreshLocalFiles();
+        if (ReportSelector.Items.Count > 0) ReportSelector.SelectedIndex = 0;
+        HistoryExpander.IsExpanded = history;
+        MainTabs.SelectedItem = ReportsTab;
+    }
+
+    private void ReportSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshingFiles) return;
+        ReportGrid.ItemsSource = null;
+        ReportSummaryText.Text = "Отчётов пока нет.";
+        if (ReportSelector.SelectedItem is not LocalFile { Path: not null } file) return;
+        try
+        {
+            var report = LocalReports.Read(file.Path);
+            ReportSummaryText.Text = report.Summary;
+            ReportGrid.ItemsSource = report.Rows;
+        }
+            catch (Exception exception) { ReportSummaryText.Text = "Не удалось прочитать отчёт: " + exception.Message; }
+    }
+
+    private void JournalSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshingFiles) return;
+        var file = JournalSelector.SelectedItem as LocalFile;
+        try { LogBox.Text = file?.Path is null ? _liveLog : LocalReports.ReadLogTail(file.Path); }
+        catch (Exception exception) { LogBox.Text = "Не удалось открыть журнал: " + exception.Message; }
+        OpenRunLogButton.IsEnabled = File.Exists(file?.Path ?? _activeRunLogPath);
+        LogBox.ScrollToEnd();
+    }
+
+    private void LiveJournalButton_Click(object sender, RoutedEventArgs e)
+    {
+        JournalSelector.SelectedIndex = 0;
+        MainTabs.SelectedItem = JournalTab;
+    }
+
+    private void CopyJournalButton_Click(object sender, RoutedEventArgs e)
+    {
+        try { Clipboard.SetText(LogBox.Text); }
+        catch (Exception exception) { AppendLog("Не удалось скопировать журнал: " + exception.Message); }
     }
 }

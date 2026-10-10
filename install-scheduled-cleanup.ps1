@@ -172,6 +172,7 @@ $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interact
 
 try {
     Get-ScheduledTask -TaskPath $taskPath -ErrorAction SilentlyContinue |
+        Where-Object { $_.TaskName -in @('Pressure Guard', 'Startup Guard', 'Deep Weekly') } |
         Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
 }
 catch {

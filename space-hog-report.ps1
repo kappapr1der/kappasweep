@@ -479,6 +479,13 @@ if (-not $Quick) {
     if (-not [string]::IsNullOrWhiteSpace($reportPath)) {
         Write-Host ""
         Write-Host "HTML-отчёт: $reportPath" -ForegroundColor Green
+        [ordered]@{
+            schemaVersion = 1
+            kind = 'storage'
+            generated = (Get-Date).ToString('o')
+            results = $sortedItems
+            drives = $selectedDrives
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($reportPath, '.json')) -Encoding UTF8 -ErrorAction Stop
         if ($OpenReport) {
             try {
                 $chromeOpener = Join-Path $PSScriptRoot "open-report-in-chrome.ps1"

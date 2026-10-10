@@ -21,3 +21,5 @@ launcher/assets/kappasweep-icon-source.png
 .pagefile-*.json
 .pagefile-*.txt
 .system-space-audit.txt
+tests/launcher/bin/
+tests/launcher/obj/

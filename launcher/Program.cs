@@ -22,6 +22,8 @@ internal static class Program
             ExtractPayload(engineRoot);
 
             var commandLine = Environment.GetCommandLineArgs();
+            if (commandLine.Contains("--interaction-test"))
+                return MainWindow.RunInteractionSmokeTest(engineRoot) ? 0 : 1;
             if (commandLine.Any(argument =>
                     string.Equals(argument, "--test", StringComparison.OrdinalIgnoreCase)))
             {
@@ -33,7 +35,9 @@ internal static class Program
                 var outputIndex = Array.IndexOf(commandLine, "--render-output");
                 var renderOutput = outputIndex >= 0 && outputIndex + 1 < commandLine.Length
                     ? commandLine[outputIndex + 1] : null;
-                return MainWindow.RunRenderSmokeTest(engineRoot, renderOutput) ? 0 : 1;
+                var tabIndex = Array.IndexOf(commandLine, "--render-tab");
+                var tab = tabIndex >= 0 && tabIndex + 1 < commandLine.Length ? commandLine[tabIndex + 1] : null;
+                return MainWindow.RunRenderSmokeTest(engineRoot, renderOutput, tab, commandLine.Contains("--compact")) ? 0 : 1;
             }
 
             var app = new Application
