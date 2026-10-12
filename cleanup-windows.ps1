@@ -46,7 +46,7 @@ if (Test-Path -LiteralPath $encodingHelper -PathType Leaf) {
     . $encodingHelper
 }
 
-$script:KappaSweepVersion = "1.3.2"
+$script:KappaSweepVersion = "1.3.3"
 $script:DeletedBytes = [int64]0
 $script:DeletedItems = 0
 $script:PotentialBytes = [int64]0

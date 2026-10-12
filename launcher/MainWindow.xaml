@@ -1,6 +1,7 @@
 <Window x:Class="KappaSweepLauncher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:KappaSweepLauncher"
         Title="KappaSweep Control Center"
         Width="1120" Height="840" MinWidth="900" MinHeight="700"
         WindowStartupLocation="CenterScreen"
@@ -32,6 +33,36 @@
         <Style TargetType="{x:Type CheckBox}">
             <Setter Property="Margin" Value="0,5,16,5" />
             <Setter Property="FontSize" Value="14" />
+        </Style>
+        <Style x:Key="ReportModeButton" TargetType="{x:Type RadioButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <Border x:Name="Segment" Padding="14,8" Background="#E4ECEE" BorderBrush="#B8C8CC" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Segment" Property="Background" Value="#147D78" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Segment" Property="BorderBrush" Value="#172B32" />
+                                <Setter TargetName="Segment" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ReportToolButton" TargetType="{x:Type Button}" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="16" />
         </Style>
     </Window.Resources>
 
@@ -141,31 +172,84 @@
             </TabItem>
 
             <TabItem x:Name="ReportsTab" Header="Отчёты и история">
-                <Grid Margin="18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <WrapPanel>
-                        <Button x:Name="SpaceReportButton" Content="Диагностика места" Click="SpaceReportButton_Click" />
-                        <Button x:Name="OpenLatestReportButton" Content="Последний отчёт" Style="{StaticResource SecondaryButton}" Click="OpenLatestReportButton_Click" />
-                        <Button x:Name="ShowHistoryButton" Content="Динамика очистки" Style="{StaticResource SecondaryButton}" Click="ShowHistoryButton_Click" />
-                        <Button x:Name="OpenLogsButton" Content="Журнал" Style="{StaticResource SecondaryButton}" Click="OpenLogsButton_Click" />
-                    </WrapPanel>
-                    <Expander x:Name="HistoryExpander" Grid.Row="1" Header="Динамика очистки" Margin="0,0,0,10">
-                      <StackPanel>
-                        <TextBlock x:Name="HistorySummaryText" Text="История загрузится после первого запуска." TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,7,0,0" />
-                        <StackPanel x:Name="HistoryBarsPanel" Orientation="Horizontal" Height="92" Margin="0,8,0,2" VerticalAlignment="Bottom" />
-                        <TextBlock x:Name="HistoryCategoriesText" TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,4,0,16" />
-                      </StackPanel>
-                    </Expander>
-                    <StackPanel Grid.Row="2">
-                        <ComboBox x:Name="ReportSelector" DisplayMemberPath="Label" MinHeight="32" SelectionChanged="ReportSelector_SelectionChanged" />
-                        <TextBlock x:Name="ReportSummaryText" Text="Отчётов пока нет." TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,10,0,12" />
+                <ScrollViewer x:Name="ReportBodyScroll" Margin="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ReportSelector" DisplayMemberPath="Label" MinHeight="34" MinWidth="120" SelectionChanged="ReportSelector_SelectionChanged" AutomationProperties.Name="Отчёт" />
+                        <StackPanel x:Name="StorageToolbar" Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed" Margin="8,0,4,0">
+                            <RadioButton x:Name="DiagramModeButton" Content="Диаграмма" GroupName="ReportView" Style="{StaticResource ReportModeButton}" Checked="ReportMode_Checked" Width="108" Height="34" />
+                            <RadioButton x:Name="ListModeButton" Content="Список" GroupName="ReportView" Style="{StaticResource ReportModeButton}" Checked="ReportMode_Checked" Width="78" Height="34" />
+                            <ComboBox x:Name="ReportDriveSelector" Width="108" Height="34" Margin="8,0,0,0" DisplayMemberPath="Label" SelectionChanged="ReportDrive_SelectionChanged" AutomationProperties.Name="Диск отчёта" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="SpaceReportButton" Content="&#xE721;" ToolTip="Диагностика места" AutomationProperties.Name="Диагностика места" Style="{StaticResource ReportToolButton}" Click="SpaceReportButton_Click" />
+                            <Button x:Name="OpenLatestReportButton" Content="&#xE72C;" ToolTip="Последний отчёт" AutomationProperties.Name="Последний отчёт" Style="{StaticResource ReportToolButton}" Click="OpenLatestReportButton_Click" />
+                            <Button x:Name="ShowHistoryButton" Content="&#xE9D9;" ToolTip="Динамика очистки" AutomationProperties.Name="Динамика очистки" Style="{StaticResource ReportToolButton}" Click="ShowHistoryButton_Click" />
+                            <Button x:Name="OpenLogsButton" Content="&#xE8A5;" ToolTip="Журнал" AutomationProperties.Name="Журнал" Style="{StaticResource ReportToolButton}" Click="OpenLogsButton_Click" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock x:Name="ReportSummaryText" Text="Отчётов пока нет." TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,2,0,12" />
+                    <StackPanel x:Name="StoragePanel" Visibility="Collapsed">
+                        <Grid MinHeight="224">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="240" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="220" Height="220" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <Viewbox><local:StorageDonut x:Name="StorageDonut" Width="240" Height="240" /></Viewbox>
+                                <StackPanel Width="128" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <TextBlock x:Name="StorageTotalText" FontSize="19" FontWeight="SemiBold" Foreground="#172B32" TextWrapping="Wrap" TextAlignment="Center" />
+                                    <TextBlock Text="измерено" Foreground="#5A6B72" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <ListBox x:Name="StorageLegend" Grid.Column="1" Height="224" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="StorageLegend_SelectionChanged">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="{x:Type ListBoxItem}">
+                                        <Setter Property="Padding" Value="8,2" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="ToolTip" Value="{Binding Description}" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="12" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="132" />
+                                            </Grid.ColumnDefinitions>
+                                            <Rectangle Fill="{Binding Color}" Width="10" Height="10" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis" Margin="10,0,12,0" VerticalAlignment="Center" Foreground="#172B32" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Value}" TextAlignment="Right" VerticalAlignment="Center" Foreground="#344B52" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                        <TextBlock x:Name="StorageCoverageText" TextWrapping="Wrap" Foreground="#5A6B72" FontSize="12" Margin="0,8,0,0" />
+                        <TextBlock x:Name="StorageEmptyText" Text="В этом отчёте нет измеренных целей для выбранного диска." Visibility="Collapsed" TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,4,0,8" />
+                        <Border x:Name="StorageDetailsPanel" BorderBrush="#D3DEE1" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,8,0,0">
+                            <StackPanel>
+                                <TextBlock x:Name="StorageDetailTitle" FontWeight="SemiBold" FontSize="15" Foreground="#172B32" TextWrapping="Wrap" />
+                                <TextBlock x:Name="StorageDetailStatus" Foreground="#5A6B72" TextWrapping="Wrap" Margin="0,5,0,5" />
+                                <TextBox x:Name="StorageDetailPath" IsReadOnly="True" TextWrapping="Wrap" Background="Transparent" BorderThickness="0" Foreground="#344B52" Padding="0" MaxHeight="84" VerticalScrollBarVisibility="Auto" />
+                                <DataGrid x:Name="StorageDetailsGrid" Height="160" Margin="0,8,0,0" Visibility="Collapsed" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeaderWidth="0" EnableRowVirtualization="True" Background="White" BorderBrush="#D3DEE1">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Цель" Binding="{Binding Label}" Width="2*" />
+                                        <DataGridTextColumn Header="Размер" Binding="{Binding Size}" Width="90" />
+                                        <DataGridTextColumn Header="Действие" Binding="{Binding Status}" Width="2*" />
+                                        <DataGridTextColumn Header="Путь" Binding="{Binding Path}" Width="3*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                    <DataGrid x:Name="ReportGrid" Grid.Row="3" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderBrush="#D3DEE1">
+                    <DataGrid x:Name="ReportGrid" Height="300" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderBrush="#D3DEE1">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Категория / цель" Binding="{Binding Label}" Width="2*" MinWidth="130" />
                             <DataGridTextColumn Header="Размер" Binding="{Binding Size}" Width="90" />
@@ -173,7 +257,15 @@
                             <DataGridTextColumn Header="Путь" Binding="{Binding Path}" Width="3*" MinWidth="160" />
                         </DataGrid.Columns>
                     </DataGrid>
-                </Grid>
+                    <Expander x:Name="HistoryExpander" Header="Динамика очистки" Margin="0,16,0,0">
+                      <StackPanel>
+                        <TextBlock x:Name="HistorySummaryText" Text="История загрузится после первого запуска." TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,7,0,0" />
+                        <StackPanel x:Name="HistoryBarsPanel" Orientation="Horizontal" Height="92" Margin="0,8,0,2" VerticalAlignment="Bottom" />
+                        <TextBlock x:Name="HistoryCategoriesText" TextWrapping="Wrap" Foreground="#5A6B72" Margin="0,4,0,16" />
+                      </StackPanel>
+                    </Expander>
+                  </StackPanel>
+                </ScrollViewer>
             </TabItem>
             <TabItem x:Name="JournalTab" Header="Журнал">
                 <Grid Margin="18">

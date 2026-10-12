@@ -6,8 +6,9 @@ using System.Text.RegularExpressions;
 namespace KappaSweepLauncher;
 
 internal sealed record LocalFile(string Label, string? Path, DateTime Time);
-internal sealed record ReportRow(string Label, string Size, string Status, string Path);
-internal sealed record ReportView(string Summary, IReadOnlyList<ReportRow> Rows);
+internal sealed record ReportRow(string Label, string Size, string Status, string Path, long Bytes = 0);
+internal sealed record ReportView(string Summary, IReadOnlyList<ReportRow> Rows, bool IsStorage = false,
+    IReadOnlyList<string>? Drives = null, bool IsTruncated = false);
 
 internal static class LocalReports
 {
@@ -61,8 +62,8 @@ internal static class LocalReports
         var storage = Text(report, "kind") == "storage";
         var results = report["results"] as JsonArray ?? new JsonArray();
         var rows = results.OfType<JsonObject>().Take(2000).Select(row => storage
-            ? new ReportRow(Text(row, "Name"), Size(Number(row, "SizeBytes")), Text(row, "Action"), Text(row, "Path"))
-            : new ReportRow(Text(row, "Label"), Size(Number(row, "Bytes")), Status(Text(row, "Status")), Text(row, "Path")))
+            ? new ReportRow(Text(row, "Name"), Size(Number(row, "SizeBytes")), Text(row, "Action"), Text(row, "Path"), Math.Max(0, Number(row, "SizeBytes")))
+            : new ReportRow(Text(row, "Label"), Size(Number(row, "Bytes")), Status(Text(row, "Status")), Text(row, "Path"), Math.Max(0, Number(row, "Bytes"))))
             .ToArray();
         var mode = Text(report, "mode");
         var summary = storage ? "Диагностика места. Файлы не удалялись."
@@ -71,7 +72,9 @@ internal static class LocalReports
             summary += $" Свободно после: {Size(Number(after, "FreeBytes"))}.";
         var tips = (report["tips"] as JsonArray)?.Select(node => node?.GetValue<string>()).Where(tip => !string.IsNullOrWhiteSpace(tip)).Take(5);
         if (tips is not null) summary += "\n" + string.Join("\n", tips);
-        return new ReportView(summary, rows);
+        var drives = (report["drives"] as JsonArray)?.OfType<JsonObject>()
+            .Select(drive => Text(drive, "Drive")).ToArray();
+        return new ReportView(summary, rows, storage, drives, results.Count > 2000);
     }
 
     private static ReportView ReadLegacyLog(string path)

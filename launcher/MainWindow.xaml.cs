@@ -18,7 +18,7 @@ namespace KappaSweepLauncher;
 
 public partial class MainWindow : Window
 {
-    private const string Version = "1.3.2";
+    private const string Version = "1.3.3";
     private const long WorkingSetLimitBytes = 1536L * 1024 * 1024;
     private static readonly HttpClient UpdateClient = new() { Timeout = TimeSpan.FromSeconds(8) };
 
@@ -53,6 +53,7 @@ public partial class MainWindow : Window
         }
 
         InitializeComponent();
+        InitializeReportPresentation();
         Icon = LoadWindowIcon();
         _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _monitorTimer.Tick += MonitorTimer_Tick;
@@ -135,6 +136,17 @@ public partial class MainWindow : Window
             if (tab == "journal") window.LiveJournalButton_Click(window, new RoutedEventArgs());
             if (tab == "reports") window.ShowReports();
             if (tab == "history") window.ShowReports(history: true);
+            if (tab?.StartsWith("storage", StringComparison.Ordinal) == true)
+            {
+                window._refreshingFiles = true;
+                window.ReportSelector.ItemsSource = new[] { new LocalFile("Тестовый отчёт · Диагностика места", null, DateTime.Now) };
+                window.ReportSelector.SelectedIndex = 0;
+                window._refreshingFiles = false;
+                window._reportPreferences = new ReportPreferences(tab == "storage-list" ? "list" : "diagram");
+                window.ApplyReport(StorageTestFixture(tab == "storage-empty"));
+                if (tab == "storage-other") window.StorageLegend.SelectedIndex = 7;
+                window.MainTabs.SelectedItem = window.ReportsTab;
+            }
             if (tab == "update")
             {
                 window._availableUpdate = new ReleaseUpdate("v9.0.0", new Uri("https://github.com/kappapr1der/kappasweep"), 1, new string('0', 64));
@@ -235,7 +247,7 @@ public partial class MainWindow : Window
                         || !window.ReportSummaryText.Text.StartsWith("Очищено")
                         || window.ReportGrid.Items.Count != 1
                         || !window._liveLog.Contains("Живой журнал")
-                        || !window.IsLoaded) { timer.Stop(); application.Shutdown(1); return; }
+                        || !window.IsLoaded || !window.VerifyStorageInteraction()) { timer.Stop(); application.Shutdown(1); return; }
                     phase = 1;
                     window.StartAction("Тест ошибки", "failure.ps1");
                 }
@@ -1127,21 +1139,27 @@ public partial class MainWindow : Window
         if (ReportSelector.Items.Count > 0) ReportSelector.SelectedIndex = 0;
         HistoryExpander.IsExpanded = history;
         MainTabs.SelectedItem = ReportsTab;
+        if (history) HistoryExpander.BringIntoView();
+        else ReportBodyScroll.ScrollToTop();
     }
 
     private void ReportSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshingFiles) return;
-        ReportGrid.ItemsSource = null;
+        _loadedReport = null;
+        RefreshReportPresentation();
         ReportSummaryText.Text = "Отчётов пока нет.";
         if (ReportSelector.SelectedItem is not LocalFile { Path: not null } file) return;
         try
         {
-            var report = LocalReports.Read(file.Path);
-            ReportSummaryText.Text = report.Summary;
-            ReportGrid.ItemsSource = report.Rows;
+            ApplyReport(LocalReports.Read(file.Path));
         }
-            catch (Exception exception) { ReportSummaryText.Text = "Не удалось прочитать отчёт: " + exception.Message; }
+        catch (Exception exception)
+        {
+            _loadedReport = null;
+            RefreshReportPresentation();
+            ReportSummaryText.Text = "Не удалось прочитать отчёт: " + exception.Message;
+        }
     }
 
     private void JournalSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)

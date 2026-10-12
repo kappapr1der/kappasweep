@@ -67,6 +67,52 @@ try
         {"schemaVersion":1,"kind":"storage","results":[{"Name":"NVIDIA","SizeBytes":1024,"Action":"Проверить","Path":"C:\\Cache"}]}
         """);
     Check(LocalReports.Read(storagePath).Rows[0].Status == "Проверить", "storage report read");
+    Check(LocalReports.Read(storagePath).IsStorage && LocalReports.Read(storagePath).Rows[0].Bytes == 1024, "storage retains numeric bytes for charts");
+    Check(!report.IsStorage, "cleanup reports remain lists");
+    ReportRow Row(string path, long bytes, string label = "Target") => new(label, LocalReports.Size(bytes), "Только диагностика", path, bytes);
+    var chartRows = new[]
+    {
+        Row(@"C:\Cache", 100), Row(@"c:\cache\", 90, "Duplicate"), Row(@"C:\Cache\Music", 40),
+        Row(@"C:\Cache-old", 30), Row(@"D:\Music", 70), Row(@"C:/Cache/./Music", 40),
+        Row(@"C:\Empty", 0), Row(@"C:\Negative", -2), Row("relative-folder", 20)
+    };
+    var chart = StorageChart.Create(chartRows);
+    Check(chart.TotalBytes == 200 && chart.Slices.Count == 3 && chart.OverlapCount == 3, "duplicate and nested paths counted once; sibling prefix retained");
+    Check(chart.UnmappedCount == 1, "unmapped paths excluded from percentages");
+    Check(Math.Abs(chart.Slices.Sum(slice => slice.Percent) - 100) < 0.00001, "chart shares sum to 100 percent");
+    Check(StorageChart.Create(chartRows, "c:").TotalBytes == 130, "drive filter is case insensitive");
+    Check(StorageChart.FilterRows(chartRows, "D:").Count == 1, "list uses same drive filter");
+    Check(StorageChart.Create([Row(@"C:\", 1000), Row(@"C:\Cache", 100)]).TotalBytes == 1000, "drive root contains descendants");
+    Check(StorageChart.Create([Row(@"Z:\nonexistent\..\folder", 10)]).TotalBytes == 10, "chart uses saved paths without filesystem access");
+    var grouped = StorageChart.Create(Enumerable.Range(1, 10).Select(i => Row(@"C:\item" + i, i)).ToArray());
+    Check(grouped.Slices.Count == 8 && grouped.Slices[^1].Label == "Прочее" && grouped.Slices[^1].Bytes == 6
+        && grouped.Slices[^1].Rows.Count == 3 && grouped.TotalBytes == 55, "top seven and exact remainder retain drilldown targets");
+    Check(StorageChart.Create([]).Slices.Count == 0 && StorageChart.Create(chartRows, "E:").TotalBytes == 0, "empty report and empty drive handled");
+    Check(StorageChart.Create([Row(@"C:\Only", 10)]).Slices.Single().Percent == 100, "single target uses full ring");
+    Check(StorageChart.Create(Enumerable.Range(0, 2100).Select(i => Row(@"C:\bounded" + i, 1)).ToArray()).TotalBytes == 2000,
+        "chart computation is bounded to 2000 targets");
+    Reject(() => StorageChart.Create([Row(@"C:\One", long.MaxValue), Row(@"D:\Two", 1)]), "overflowing totals rejected");
+    var reportDrives = new ReportView("", chartRows, true, ["E:", "c:"]);
+    Check(StorageChart.Drives(reportDrives).SequenceEqual(new[] { "C:", "D:", "E:" }), "drive choices combine saved rows and disk snapshots");
+    var preferencesPath = Path.Combine(folder, "ui-preferences.json");
+    Check(ReportPreferences.Load(preferencesPath).Mode == "diagram", "diagram is default for new users");
+    new ReportPreferences("list", "D:").Save(preferencesPath);
+    Check(ReportPreferences.Load(preferencesPath) == new ReportPreferences("list", "D:"), "view and drive preferences persist separately");
+    File.WriteAllText(preferencesPath, "not-json");
+    Check(ReportPreferences.Load(preferencesPath) == new ReportPreferences(), "corrupt preferences do not prevent startup");
+    File.WriteAllText(preferencesPath, new string('x', 5000));
+    Check(ReportPreferences.Load(preferencesPath) == new ReportPreferences(), "oversized preferences are bounded");
+    File.WriteAllText(preferencesPath, "{\"Mode\":\"unknown\",\"Drive\":null}");
+    Check(ReportPreferences.Load(preferencesPath) == new ReportPreferences(), "unknown preference values default safely");
+    var boundedPath = Path.Combine(folder, "bounded.json");
+    File.WriteAllText(boundedPath, new JsonObject
+    {
+        ["schemaVersion"] = 1, ["kind"] = "storage",
+        ["results"] = new JsonArray(Enumerable.Range(0, 2001).Select(i => (JsonNode)new JsonObject
+            { ["Name"] = "Target", ["SizeBytes"] = 1, ["Path"] = @"C:\bounded" + i }).ToArray())
+    }.ToJsonString());
+    var boundedReport = LocalReports.Read(boundedPath);
+    Check(boundedReport.Rows.Count == 2000 && boundedReport.IsTruncated, "truncated reports expose their coverage limit");
     File.WriteAllText(Path.Combine(folder, "latest.json"), "{}");
     Check(LocalReports.Find(new[] { folder, folder }, true).Count == 2, "report discovery deduplicates and skips aliases");
     var log = Path.Combine(folder, "cleanup-test.log");
@@ -85,10 +131,11 @@ try
         writer.Write("not extracted");
     }
     var extract = Path.Combine(folder, "extract"); Directory.CreateDirectory(extract);
-    Check(File.Exists(ReleaseUpdate.ExtractExecutable(zip, extract, "v1.3.2")), "built executable version validated");
+    var builtVersion = FileVersionInfo.GetVersionInfo(Path.GetFullPath(args[1])).ProductVersion!.Split('+')[0];
+    Check(File.Exists(ReleaseUpdate.ExtractExecutable(zip, extract, "v" + builtVersion)), "built executable version validated");
     Check(!File.Exists(Path.Combine(folder, "escape.txt")), "archive traversal entry never extracted");
     var wrongVersion = Path.Combine(folder, "wrong-version"); Directory.CreateDirectory(wrongVersion);
-    Reject(() => ReleaseUpdate.ExtractExecutable(zip, wrongVersion, "v1.3.3"), "mismatched executable rejected");
+    Reject(() => ReleaseUpdate.ExtractExecutable(zip, wrongVersion, "v999.0.0"), "mismatched executable rejected");
     var helper = ReleaseUpdate.BuildInstallCommand(123, "C:\\It's\\new.exe", "C:\\App\\old.exe", folder);
     Check(helper.Contains("It''s") && helper.Contains("WaitForExit(60000)") && helper.Contains("-Destination $backup")
         && helper.Contains("Copy-Item -LiteralPath $backup -Destination $target -Force"), "installer quoting, wait, backup and rollback");

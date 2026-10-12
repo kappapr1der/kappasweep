@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../launcher/LocalReports.cs" Link="LocalReports.cs" />
+    <Compile Include="../../launcher/StorageChart.cs" Link="StorageChart.cs" />
     <Compile Include="../../launcher/ReleaseUpdate.cs" Link="ReleaseUpdate.cs" />
   </ItemGroup>
 </Project>

@@ -17,7 +17,7 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
-$script:KappaSweepVersion = "1.3.2"
+$script:KappaSweepVersion = "1.3.3"
 $script:PowerShellPath = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 $script:ConfigPath = Join-Path $PSScriptRoot "kappasweep-config.json"
 $script:ActiveProcess = $null
